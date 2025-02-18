@@ -1,4 +1,5 @@
 import 'package:animalgo/screens/home/HomeScreen.dart';
+import 'package:animalgo/screens/login/LoginScreen.dart';
 import 'package:flutter/material.dart';
 import 'screens/village_screen.dart'; // 마을 화면 import
 
@@ -64,7 +65,7 @@ class _CharacterSelectScreenState extends State<CharacterSelectScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) =>
-                          HomeScreen(selectedCharacter: selectedCharacter),
+                          LoginScreen(selectedCharacter: selectedCharacter),
                     ),
                   );
                 },
