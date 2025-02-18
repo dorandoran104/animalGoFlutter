@@ -6,11 +6,17 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 // import 'package:animalgo/service/ApiService.dart';
 
 class RegistScreen extends StatefulWidget {
+  final String selectedCharacter;
+  const RegistScreen({
+    Key? key,
+    required this.selectedCharacter,
+  }) : super(key: key);
   @override
   _RegistScreenState createState() => _RegistScreenState();
 }
 
 class _RegistScreenState extends State<RegistScreen> {
+  late String userCharacter;
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
@@ -43,6 +49,7 @@ class _RegistScreenState extends State<RegistScreen> {
   @override
   void initState() {
     super.initState();
+    userCharacter = widget.selectedCharacter;
 
     // FocusNode에 리스너 추가
     _idFocusNode.addListener(() {
@@ -142,7 +149,7 @@ class _RegistScreenState extends State<RegistScreen> {
               context,
               PageRouteBuilder(
                 pageBuilder: (context, animation, secondaryAnimation) =>
-                    LoginScreen(),
+                    LoginScreen(selectedCharacter: userCharacter,),
                 transitionDuration: Duration.zero,
               ),
             );

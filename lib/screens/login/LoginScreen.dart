@@ -10,11 +10,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class LoginScreen extends StatefulWidget {
+  final String selectedCharacter;
+  LoginScreen({required this.selectedCharacter});
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  late String userCharacter;
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
@@ -33,6 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
       //   _passwordController.text = '';
       // });
     });
+    userCharacter = widget.selectedCharacter;
   }
 
   @override
@@ -111,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
             // 'HomeScreen' // MaterialPageRoute(builder: (context) => HomeScreen()
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
-                  HomeScreen(),
+                  HomeScreen(selectedCharacter: userCharacter),
             ));
       }
     } on DioException catch(e){
@@ -222,7 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => RegistScreen()),
+                    MaterialPageRoute(builder: (context) => RegistScreen(selectedCharacter: userCharacter,)),
                   );
                 },
                 style: ElevatedButton.styleFrom(

@@ -86,13 +86,97 @@ dev_dependencies:
   
 
   # To add assets to your application, add an assets section, like this:
-flutter: 
+flutter:
   uses-material-design: true
   assets:
-    - assets/images/default_profile.png
-    - assets/images/dog1.png
-    - assets/images/dog2.png
-    - assets/images/dog3.png
+    - assets/images/skill/carnage_skill_1_left.png
+    - assets/images/skill/carnage_skill_1_right.png
+    - assets/images/skill/carnage_skill_2_left.png
+    - assets/images/skill/carnage_skill_2_right.png
+    - assets/images/skill/carnage_skill_3_left.png
+    - assets/images/skill/carnage_skill_3_right.png
+    - assets/images/skill/carnage_skill_4_left.png
+    - assets/images/skill/carnage_skill_4_right.png
+    - assets/images/skill/venom_skill_1_left.png
+    - assets/images/skill/venom_skill_1_right.png
+    - assets/images/skill/venom_skill_2_left.png
+    - assets/images/skill/venom_skill_2_right.png
+    - assets/images/skill/venom_skill_3_left.png
+    - assets/images/skill/venom_skill_3_right.png
+    - assets/images/skill/venom_skill_4_left.png
+    - assets/images/skill/venom_skill_4_right.png
+    - assets/images/skill/toxin_skill_1_left.png
+    - assets/images/skill/toxin_skill_1_right.png
+    - assets/images/skill/toxin_skill_2_left.png
+    - assets/images/skill/toxin_skill_2_right.png
+    - assets/images/skill/toxin_skill_3_left.png
+    - assets/images/skill/toxin_skill_3_right.png
+    - assets/images/skill/toxin_skill_4_left.png
+    - assets/images/skill/toxin_skill_4_right.png
+    - assets/images/skill/anti_venom_skill_1_left.png
+    - assets/images/skill/anti_venom_skill_1_right.png
+    - assets/images/skill/anti_venom_skill_2_left.png
+    - assets/images/skill/anti_venom_skill_2_right.png
+    - assets/images/skill/anti_venom_skill_3_left.png
+    - assets/images/skill/anti_venom_skill_3_right.png
+    - assets/images/skill/anti_venom_skill_4_left.png
+    - assets/images/skill/anti_venom_skill_4_right.png
+    - assets/images/jump_skill/carnage_jump_skill_1_left.png
+    - assets/images/jump_skill/carnage_jump_skill_1_right.png
+    - assets/images/jump_skill/carnage_jump_skill_2_left.png
+    - assets/images/jump_skill/carnage_jump_skill_2_right.png
+    - assets/images/jump_skill/carnage_jump_skill_3_left.png
+    - assets/images/jump_skill/carnage_jump_skill_3_right.png
+    - assets/images/jump_skill/carnage_jump_skill_4_left.png
+    - assets/images/jump_skill/carnage_jump_skill_4_right.png
+    # - assets/images/jump_skill/anti_venom_jump_skill_1_left.png
+    # - assets/images/jump_skill/anti_venom_jump_skill_1_right.png
+    # - assets/images/jump_skill/anti_venom_jump_skill_2_left.png
+    # - assets/images/jump_skill/anti_venom_jump_skill_2_right.png
+    # - assets/images/jump_skill/anti_venom_jump_skill_3_left.png
+    # - assets/images/jump_skill/anti_venom_jump_skill_3_right.png
+    # - assets/images/jump_skill/anti_venom_jump_skill_4_left.png
+    # - assets/images/jump_skill/anti_venom_jump_skill_4_right.png
+    - assets/images/characters/toxin_up.png
+    - assets/images/characters/toxin_down.png
+    - assets/images/characters/toxin_left.png
+    - assets/images/characters/toxin_right.png
+    - assets/images/characters/carnage_up.png
+    - assets/images/characters/carnage_down.png
+    - assets/images/characters/carnage_left.png
+    - assets/images/characters/carnage_right.png
+    - assets/images/characters/venom_up.png
+    - assets/images/characters/venom_down.png
+    - assets/images/characters/venom_left.png
+    - assets/images/characters/venom_right.png
+    - assets/images/characters/anti_venom_up.png
+    - assets/images/characters/anti_venom_down.png
+    - assets/images/characters/anti_venom_left.png
+    - assets/images/characters/anti_venom_right.png
+    - assets/images/jump/carnage_jump_left.png
+    - assets/images/jump/carnage_jump_right.png
+    - assets/images/jump/carnage_jump_up.png
+    - assets/images/jump/carnage_jump_down.png
+    - assets/images/jump/toxin_jump_up.png
+    - assets/images/jump/toxin_jump_down.png
+    - assets/images/jump/toxin_jump_left.png
+    - assets/images/jump/toxin_jump_right.png
+    - assets/images/jump/anti_venom_jump_up.png
+    - assets/images/jump/anti_venom_jump_down.png
+    - assets/images/jump/anti_venom_jump_left.png
+    - assets/images/jump/anti_venom_jump_right.png
+    # - assets/images/jump/venom_jump_left.png
+    # - assets/images/jump/venom_jump_up.png
+    # - assets/images/jump/venom_jump_down.png
+    # - assets/images/jump/venom_jump_right.png
+    - assets/images/main/carnage_main.png
+    - assets/images/main/venom_main.png
+    - assets/images/main/toxin_main.png
+    - assets/images/main/anti_venom_main.png
+    # - assets/images/walk/anti_venom_walk_left_0.png
+    # - assets/images/walk/anti_venom_walk_right_0.png
+    # - assets/images/walk/anti_venom_walk_left_1.png
+    # - assets/images/walk/anti_venom_walk_right_1.png
     - assets/images/bear_left.png
     - assets/images/bear_right.png
     - assets/images/cat_left.png

@@ -18,11 +18,17 @@ import 'setting/settings_provider.dart';
 
 // 카메라 화면을 담당하는 StatefulWidget
 class CameraScreen extends StatefulWidget {
+  final String selectedCharacter;
+  const CameraScreen({
+    Key? key,
+    required this.selectedCharacter,
+  }) : super(key: key);
   @override
   _CameraScreenState createState() => _CameraScreenState();
 }
 
 class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver {
+  late String userCharacter;
   CameraController? _controller;
   bool _isDisposed = false;
   bool _isProcessing = false;
@@ -38,6 +44,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeCamera();
+    userCharacter = widget.selectedCharacter;
   }
   // 앱 상태가 변경될 때 호출되는 함수 (예: 앱이 백그라운드로 갈 때)
   @override
@@ -194,7 +201,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     if (!await networkProvider.isFullyConnected()) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => CaptureRetryScreen()),
+        MaterialPageRoute(builder: (context) => CaptureRetryScreen(selectedCharacter: userCharacter,)),
       );
       return;
     }
@@ -228,6 +235,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
               builder: (context) => MetadataDropdownScreen(
                 segmentedImagePath: segmentedTempPath,
                 originalImagePath: originalTempFile.path,
+                selectedCharacter: userCharacter,
               ),
             ),
           );
@@ -241,7 +249,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       // ✅ 서버 응답 실패 시 '촬영 실패' 화면으로 이동
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => CaptureRetryScreen()),
+        MaterialPageRoute(builder: (context) => CaptureRetryScreen(selectedCharacter: userCharacter,)),
       );
     }
   }

@@ -4,11 +4,15 @@ import 'dart:convert';
 import 'my_page.dart';
 
 class EditProfileScreen extends StatefulWidget {
+  final String selectedCharacter;
+  const EditProfileScreen({Key? key, required this.selectedCharacter})
+      : super(key: key);
   @override
   _EditProfileScreenState createState() => _EditProfileScreenState();
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
+  late String userCharacter;
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
@@ -18,6 +22,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _obscureText2 = true;
   String? _passwordMismatchMessage;
   bool _isValid = true;
+
+  @override
+  void initState() {
+    super.initState();
+    userCharacter = widget.selectedCharacter;
+  }
 
   void _togglePasswordVisibility1() {
     setState(() {
@@ -66,7 +76,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // MyPageScreen으로 이동
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => MyPage()),
+        MaterialPageRoute(builder: (context) => MyPage(selectedCharacter: userCharacter)),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

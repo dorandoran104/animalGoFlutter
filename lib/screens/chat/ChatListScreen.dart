@@ -4,19 +4,21 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../components/BottomBar.dart';
 import '../home/HomeScreen.dart';
-import '../village/VillageScreen.dart';
+import '../village/screens/village_screen.dart';
 import 'ChatRoomScreen.dart';
 import '../myPage/my_page.dart';
 import 'package:intl/intl.dart'; // ✅ 날짜 변환을 위해 추가
 
 class ChatListScreen extends StatefulWidget {
-  const ChatListScreen({Key? key}) : super(key: key);
+  final String selectedCharacter;
+  const ChatListScreen({super.key, required this.selectedCharacter});
 
   @override
   _ChatListScreenState createState() => _ChatListScreenState();
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
+  late String userCharacter;
   final String serverUrl = 'http://122.46.89.124:7000';
   final String userId = '1';
   List<Map<String, dynamic>> chatRooms = [];
@@ -25,6 +27,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   void initState() {
     super.initState();
     fetchChatList();
+    userCharacter = widget.selectedCharacter;
   }
 
   /// 다양한 날짜 형식을 지원하는 변환 함수
@@ -277,7 +280,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 context,
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secondaryAnimation) =>
-                      HomeScreen(),
+                      HomeScreen(selectedCharacter: userCharacter),
                   transitionDuration: Duration.zero,
                 ),
               );
@@ -287,7 +290,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 context,
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secondaryAnimation) =>
-                      VillageScreen(),
+                      VillageScreen(selectedCharacter: userCharacter),
                   transitionDuration: Duration.zero,
                 ),
               );
@@ -297,7 +300,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 context,
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secondaryAnimation) =>
-                      ChatListScreen(),
+                      ChatListScreen(selectedCharacter: userCharacter),
                   transitionDuration: Duration.zero,
                 ),
               );
@@ -307,7 +310,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 context,
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secondaryAnimation) =>
-                      MyPage(),
+                      MyPage(selectedCharacter: userCharacter),
                   transitionDuration: Duration.zero,
                 ),
               );

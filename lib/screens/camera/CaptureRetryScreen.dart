@@ -1,7 +1,22 @@
 import 'package:flutter/material.dart';
 import 'CameraScreen.dart';
 
-class CaptureRetryScreen extends StatelessWidget {
+class CaptureRetryScreen extends StatefulWidget {
+  final String selectedCharacter;
+  const CaptureRetryScreen({
+    Key? key,
+    required this.selectedCharacter,
+  }) : super(key: key);
+  @override
+  _CaptureRetryScreenState createState() => _CaptureRetryScreenState();
+}
+class _CaptureRetryScreenState extends State<CaptureRetryScreen> with WidgetsBindingObserver{
+  late String userCharacter;
+  @override
+  void initState(){
+    super.initState();
+    userCharacter = widget.selectedCharacter;
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -26,7 +41,7 @@ class CaptureRetryScreen extends StatelessWidget {
                 // ✅ 다시 촬영 화면으로 이동
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => CameraScreen()),
+                  MaterialPageRoute(builder: (context) => CameraScreen(selectedCharacter: userCharacter,)),
                 );
               },
               child: Text('다시 촬영하기'),

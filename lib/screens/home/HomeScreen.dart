@@ -10,11 +10,13 @@ import '../login/LoginScreen.dart';
 import '../myPage/my_page.dart';
 import '../chat/ChatListScreen.dart'; // ✅ 채팅 리스트 화면 추가
 import 'package:shared_preferences/shared_preferences.dart';
-import '../village_test/Village.dart';
+import '../village/screens/village_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  final String selectedCharacter;
+  const HomeScreen({Key? key, required this.selectedCharacter})
+      : super(key: key);
 
   @override
   _HomeScreenState createState() => _HomeScreenState();
@@ -23,11 +25,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   List<Map<String, dynamic>> friends = []; // ✅ 상태로 관리할 친구 목록
   bool isLoading = true; // ✅ 로딩 상태 관리
+  late String userCharacter;
 
   @override
   void initState() {
     super.initState();
     _checkSession();
+    userCharacter = widget.selectedCharacter;
   }
 
   Future<void> _checkSession() async {
@@ -38,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       // ✅ 토큰이 없으면 로그인 화면으로 이동
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => LoginScreen()),
+        MaterialPageRoute(builder: (context) => LoginScreen(selectedCharacter: userCharacter,)),
       );
       return;
     }
@@ -105,7 +109,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => CameraScreen()),
+            MaterialPageRoute(builder: (context) => CameraScreen(selectedCharacter: userCharacter,)),
           );
         },
         backgroundColor: Colors.black,
@@ -120,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 context,
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secondaryAnimation) =>
-                      HomeScreen(),
+                      HomeScreen(selectedCharacter: userCharacter),
                   transitionDuration: Duration.zero,
                 ),
               );
@@ -130,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 context,
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secondaryAnimation) =>
-                      VillageScreen(),
+                      VillageScreen(selectedCharacter: userCharacter),
                   transitionDuration: Duration.zero,
                 ),
               );
@@ -140,7 +144,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 context,
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secondaryAnimation) =>
-                      ChatListScreen(), // ✅ userId 전달 제거
+                      ChatListScreen(selectedCharacter: userCharacter), // ✅ userId 전달 제거
                   transitionDuration: Duration.zero,
                 ),
               );
@@ -150,7 +154,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 context,
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secondaryAnimation) =>
-                      MyPage(),
+                      MyPage(selectedCharacter: userCharacter),
                   transitionDuration: Duration.zero,
                 ),
               );

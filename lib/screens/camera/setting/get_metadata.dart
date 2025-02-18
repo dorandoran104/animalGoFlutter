@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'get_picture.dart';
 
 class MetadataDropdownScreen extends StatefulWidget {
+  final String selectedCharacter;
   final String segmentedImagePath; // ✅ 세그멘테이션 이미지 경로
   final String originalImagePath;  // ✅ 원본 이미지 경로
 
@@ -13,6 +14,7 @@ class MetadataDropdownScreen extends StatefulWidget {
     Key? key,
     required this.segmentedImagePath,
     required this.originalImagePath,
+    required this.selectedCharacter,
   }) : super(key: key);
 
   @override
@@ -20,6 +22,7 @@ class MetadataDropdownScreen extends StatefulWidget {
 }
 
 class _MetadataDropdownScreenState extends State<MetadataDropdownScreen> {
+  late String userCharacter;
   List<Map<String, String>> appearanceList = [];
   List<Map<String, String>> personalityList = [];
 
@@ -106,6 +109,7 @@ class _MetadataDropdownScreenState extends State<MetadataDropdownScreen> {
               builder: (context) => ImageFromServer(
                 characterId: savedCharacterId!,
                 originalImagePath: widget.originalImagePath,
+                selectedCharacter: userCharacter,
               ),
             ),
           );

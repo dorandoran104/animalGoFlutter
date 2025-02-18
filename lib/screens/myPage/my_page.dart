@@ -8,15 +8,19 @@ import 'DeleteAccountScreen.dart';
 import 'EditProfileScreen.dart';
 import 'SettingsScreen.dart';
 import '../chat/ChatListScreen.dart'; // ✅ 채팅 리스트 화면 추가
-import 'package:animalgo/screens/village/VillageScreen.dart'; // ✅ 마을 화면 추가
+import 'package:animalgo/screens/village/screens/village_screen.dart'; // ✅ 마을 화면 추가
 import 'package:shared_preferences/shared_preferences.dart'; // ✅ SharedPreferences 사용 예시
+import '../village/CharacterSelectScreen.dart';
 
 
 class MyPage extends StatefulWidget {
+  final String selectedCharacter;
+  MyPage({required this.selectedCharacter});
   @override
   _MyPage createState() => _MyPage();
 }
 class _MyPage extends State<MyPage> with WidgetsBindingObserver {
+  late String userCharacter;
 
   Future<String?> getUserId() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -27,6 +31,7 @@ class _MyPage extends State<MyPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    userCharacter = widget.selectedCharacter;
   }
   @override
   Widget build(BuildContext context) {
@@ -70,7 +75,7 @@ class _MyPage extends State<MyPage> with WidgetsBindingObserver {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => EditProfileScreen()),
+                  MaterialPageRoute(builder: (context) => EditProfileScreen(selectedCharacter: userCharacter)),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -114,7 +119,7 @@ class _MyPage extends State<MyPage> with WidgetsBindingObserver {
                 await prefs.remove("cookie");
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => HomeScreen()),
+                  MaterialPageRoute(builder: (context) => HomeScreen(selectedCharacter: userCharacter)),
                 );
               },
               child: Text('로그아웃'),
@@ -152,6 +157,29 @@ class _MyPage extends State<MyPage> with WidgetsBindingObserver {
               ),
             ),
             SizedBox(height: 25),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => CharacterSelectScreen()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white, // 버튼 배경색 (흰색)
+                foregroundColor: Colors.black, // 버튼 글씨 색상 (검은색)
+                padding: EdgeInsets.symmetric(vertical: 16), // 버튼 내부 패딩
+                textStyle: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold), // 텍스트 스타일
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8), // 모서리 둥글게
+                  side: BorderSide(color: Colors.black, width: 1.5), // 검은색 테두리
+                ),
+                minimumSize: Size(double.infinity, 50), // 버튼을 너비 최대로 설정
+              ),
+              child: Text('캐릭터 선택하기'),
+            ),
+            SizedBox(height: 25),
           ],
         ),
       ),
@@ -159,7 +187,7 @@ class _MyPage extends State<MyPage> with WidgetsBindingObserver {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => CameraScreen()),
+            MaterialPageRoute(builder: (context) => CameraScreen(selectedCharacter: userCharacter,)),
           );
         },
         backgroundColor: Colors.black,
@@ -173,7 +201,7 @@ class _MyPage extends State<MyPage> with WidgetsBindingObserver {
               Navigator.pushReplacement(
                 context,
                 PageRouteBuilder(
-                  pageBuilder: (context, animation, secondaryAnimation) => HomeScreen(),
+                  pageBuilder: (context, animation, secondaryAnimation) => HomeScreen(selectedCharacter: userCharacter),
                   transitionDuration: Duration.zero,
                 ),
               );
@@ -182,7 +210,7 @@ class _MyPage extends State<MyPage> with WidgetsBindingObserver {
               Navigator.pushReplacement(
                 context,
                 PageRouteBuilder(
-                  pageBuilder: (context, animation, secondaryAnimation) => VillageScreen(),
+                  pageBuilder: (context, animation, secondaryAnimation) => VillageScreen(selectedCharacter: userCharacter),
                   transitionDuration: Duration.zero,
                 ),
               );
@@ -192,7 +220,7 @@ class _MyPage extends State<MyPage> with WidgetsBindingObserver {
                 context,
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secondaryAnimation) =>
-                      ChatListScreen(),
+                      ChatListScreen(selectedCharacter: userCharacter),
                   transitionDuration: Duration.zero,
                 ),
               );
@@ -202,7 +230,7 @@ class _MyPage extends State<MyPage> with WidgetsBindingObserver {
                 context,
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secondaryAnimation) =>
-                      MyPage(),
+                      MyPage(selectedCharacter: userCharacter),
                   transitionDuration: Duration.zero,
                 ),
               );

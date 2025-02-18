@@ -16,7 +16,9 @@ class AppRouter {
     print(settings.name);
     switch (settings.name) {
       case home:
-        return MaterialPageRoute(builder: (_) => HomeScreen());
+        return MaterialPageRoute(builder: (_) => HomeScreen(
+          selectedCharacter: args != null && args.containsKey('selectedCharacter') ? args['selectedCharacter']! : "기본 캐릭터", // ✅ 값 전달
+        ));
       // case about:
       //   return MaterialPageRoute(builder: (_) => AboutScreen());
       // case profile:
@@ -26,7 +28,9 @@ class AppRouter {
       //   );
       case chatList:
         return MaterialPageRoute(
-          builder: (_) => ChatListScreen(), // ✅ userId 전달
+          builder: (_) => ChatListScreen(
+            selectedCharacter: args != null && args.containsKey('selectedCharacter') ? args['selectedCharacter']! : "기본 캐릭터", // ✅ 값 전달
+          ), // ✅ userId 전달
         );
 
       case '/chatRoom':

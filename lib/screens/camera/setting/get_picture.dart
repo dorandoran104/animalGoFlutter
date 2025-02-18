@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../../chat/ChatListScreen.dart';
 
 class ImageFromServer extends StatefulWidget {
+  final String selectedCharacter;
   final String characterId;
   final String originalImagePath;
 
@@ -12,6 +13,7 @@ class ImageFromServer extends StatefulWidget {
     Key? key,
     required this.characterId,
     required this.originalImagePath,
+    required this.selectedCharacter,
   }) : super(key: key);
 
   @override
@@ -19,8 +21,14 @@ class ImageFromServer extends StatefulWidget {
 }
 
 class _ImageFromServerState extends State<ImageFromServer> {
+  late String userCharacter;
   final TextEditingController nicknameController = TextEditingController();
   bool isLoading = false;
+
+  @override
+  void initState() {
+    userCharacter = widget.selectedCharacter;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +122,7 @@ class _ImageFromServerState extends State<ImageFromServer> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ChatListScreen(
+              builder: (context) => ChatListScreen(selectedCharacter: userCharacter
               ),
             ),
           );
