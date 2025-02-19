@@ -61,7 +61,7 @@ class _MetadataDropdownScreenState extends State<MetadataDropdownScreen> {
       request.fields['personality'] = selectedPersonality!;
       request.fields['animaltype'] = selectedAnimal!;
 
-      File file = File(widget.originalImagePath);
+      File file = File(widget.segmentedImagePath);
       if (!file.existsSync()) {
         print("❌ 파일이 존재하지 않습니다: ${widget.originalImagePath}");
         return;
@@ -108,7 +108,7 @@ class _MetadataDropdownScreenState extends State<MetadataDropdownScreen> {
             MaterialPageRoute(
               builder: (context) => ImageFromServer(
                 characterId: savedCharacterId!,
-                originalImagePath: widget.originalImagePath,
+                originalImagePath: widget.segmentedImagePath,
                 selectedCharacter: userCharacter,
               ),
             ),
