@@ -108,7 +108,7 @@ class _ImageFromServerState extends State<ImageFromServer> {
           final jsonResponse = jsonDecode(responseData);
           if (jsonResponse.containsKey('message')) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(jsonResponse['message'])),
+              SnackBar(content: Text("닉네임 설정 등록되었습니다")),
             );
           }
           Navigator.push(
