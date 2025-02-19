@@ -6,12 +6,12 @@ import '../../chat/ChatListScreen.dart';
 
 class ImageFromServer extends StatefulWidget {
   final String characterId;
-  final String originalImagePath;
+  final String segmentedImagePath;
 
   const ImageFromServer({
     Key? key,
     required this.characterId,
-    required this.originalImagePath,
+    required this.segmentedImagePath,
   }) : super(key: key);
 
   @override
@@ -25,14 +25,15 @@ class _ImageFromServerState extends State<ImageFromServer> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("닉네임 변경")),
+      backgroundColor: Colors.white,
+      appBar: AppBar(backgroundColor: Colors.white,title: Text("닉네임 변경")),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ✅ 원본 이미지 표시
-            Image.file(File(widget.originalImagePath), height: 200, fit: BoxFit.cover),
+            Image.file(File(widget.segmentedImagePath), height: 200, fit: BoxFit.cover),
             const SizedBox(height: 20),
 
             Text("새로운 닉네임 입력"),
