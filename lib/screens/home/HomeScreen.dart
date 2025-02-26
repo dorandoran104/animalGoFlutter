@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'FriendList.dart'; // FriendList 임포트
 import '../../components/BottomBar.dart'; // BottomNavBar 컴포넌트 임포트
 import '../../components/TopBar.dart'; // CustomAppBar 임포트
-import '../../service/ApiService.dart';
 import '../camera/CameraScreen.dart';
 import '../login/LoginScreen.dart';
 import '../myPage/my_page.dart';
 import '../chat/ChatListScreen.dart'; // ✅ 채팅 리스트 화면 추가
 import 'package:shared_preferences/shared_preferences.dart';
-import '../village_test/Village.dart';
+// import '../village_test/Village.dart';
+import 'package:animalgo/screens/village/VillageScreen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class HomeScreen extends StatefulWidget {

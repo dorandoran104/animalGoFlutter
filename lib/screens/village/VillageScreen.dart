@@ -23,9 +23,9 @@ class _VillageScreenState extends State<VillageScreen>{
   @override
   Widget build (BuildContext context){
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("마을"),
-      ),
+      // appBar: AppBar(
+      //   title: const Text("마을"),
+      // ),
       body: GameScreen(),
       bottomNavigationBar: Bottombar(
         currentIndex: 1,
