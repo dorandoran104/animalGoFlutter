@@ -1,15 +1,14 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:web_socket_channel/status.dart' as status;
+import 'package:intl/intl.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../components/BottomBar.dart';
 import '../home/HomeScreen.dart';
+import '../myPage/my_page.dart';
 import '../village/VillageScreen.dart';
 import 'ChatRoomScreen.dart';
-import '../myPage/my_page.dart';
-import 'package:intl/intl.dart'; // ✅ 날짜 변환을 위해 추가
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({Key? key}) : super(key: key);
@@ -19,98 +18,47 @@ class ChatListScreen extends StatefulWidget {
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
-  final String serverUrl = 'http://122.46.89.124:7000';
   final String userId = '1';
+  final String serverUrl = 'ws://122.46.89.124:7000/chat/chat/ws/list/1'; // ✅ WebSocket URL
   List<Map<String, dynamic>> chatRooms = [];
+  WebSocketChannel? channel; // ✅ WebSocket 채널
+  bool isChatListEmpty = false; // ✅ 채팅 목록이 비어있는지 확인하는 변수
 
   @override
   void initState() {
     super.initState();
-    fetchChatList();
+    connectWebSocket();
   }
 
-  /// 다양한 날짜 형식을 지원하는 변환 함수
-  String formatDate(String? dateTimeString) {
-    if (dateTimeString == null || dateTimeString.isEmpty) {
-      return "unknown";
-    }
-    try {
-      DateTime dateTime;
-      // 우선 ISO 8601 형식 파싱 시도
+  // ✅ WebSocket 연결 및 데이터 수신
+  void connectWebSocket() {
+    channel = WebSocketChannel.connect(Uri.parse(serverUrl));
+
+    channel!.stream.listen((message) {
+      print("🔹 WebSocket 수신 데이터: $message");
+
       try {
-        dateTime = DateTime.parse(dateTimeString);
-      } catch (_) {
-        // ISO 형식이 아니면, 수동 변환 진행
-        String converted = dateTimeString
-            .replaceAll("년 ", "-")
-            .replaceAll("월 ", "-")
-            .replaceAll("일", "")
-            .replaceAll("시 ", ":")
-            .replaceAll("분 ", ":")
-            .replaceAll("초", "")
-            .replaceAll("UTC+0900", "")
-            .trim();
-
-        if (converted.contains("AM") || converted.contains("PM")) {
-          RegExp amPmRegex = RegExp(r'^(\d{4}-\d{2}-\d{2}) (AM|PM) (.+)$');
-          if (amPmRegex.hasMatch(converted)) {
-            converted = converted.replaceAllMapped(amPmRegex, (match) {
-              return "${match.group(1)} ${match.group(3)} ${match.group(2)}";
-            });
-            dateTime = DateFormat("yyyy-MM-dd hh:mm:ss a").parse(converted);
-          } else {
-            dateTime = DateFormat("yyyy-MM-dd hh:mm:ss a").parse(converted);
-          }
-        } else {
-          // 24시간 형식
-          dateTime = DateFormat("yyyy-MM-dd HH:mm:ss").parse(converted);
-        }
-      }
-      return DateFormat('MM/dd').format(dateTime);
-    } catch (e) {
-      print("⚠️ 날짜 변환 오류: $e");
-      return "unknown";
-    }
-  }
-
-  /// ✅ 기존 데이터와 비교하여 변경이 있을 때만 `setState()` 실행
-  bool deepEqual(List<Map<String, dynamic>> oldData, List<Map<String, dynamic>> newData) {
-    if (oldData.length != newData.length) return false;
-    for (int i = 0; i < oldData.length; i++) {
-      if (!mapEquals(oldData[i], newData[i])) return false;
-    }
-    return true;
-  }
-
-  /// ✅ 최적화된 API 호출 (불필요한 갱신 방지)
-  Future<void> fetchChatList() async {
-    print("🔄 [ChatListScreen] 채팅 목록을 불러오는 중...");
-    try {
-      final response = await http.get(
-        Uri.parse('$serverUrl/chat/chat/list/1'),
-        headers: {"Accept-Charset": "utf-8"},
-      );
-
-      if (response.statusCode == 200) {
-        final String utf8String = utf8.decode(response.bodyBytes);
-        final Map<String, dynamic> responseData = json.decode(utf8String);
+        final Map<String, dynamic> responseData = jsonDecode(message);
         final List<dynamic>? chatList = responseData["chats"];
 
         if (chatList == null || chatList.isEmpty) {
           print("⚠️ 서버에서 받은 채팅 목록이 비어 있음!");
-          setState(() => chatRooms = []);
+          setState(() {
+            chatRooms = [];
+            isChatListEmpty = true; // ✅ 목록이 비어 있음을 표시
+          });
           return;
         }
 
-        /// 새롭게 가져온 데이터 변환
-        List<Map<String, dynamic>> newChatRooms = chatList
-            .where((chat) => chat["chat_id"] != null)
-            .map((chat) {
+        List<Map<String, dynamic>> newChatRooms = chatList.map((chat) {
           final lastMessage = chat["last_message"] ?? {};
+
+          // ✅ lastMessage 값 출력
+          //print("🔹 [DEBUG] lastMessage: $lastMessage");
+
           return {
             "chat_id": chat["chat_id"]?.toString() ?? "unknown_id",
             "nickname": chat["nickname"]?.toString() ?? "알 수 없는 사용자",
-            "personality": chat["personality"]?.toString() ?? "unknown",
             "create_at": formatDate(chat["create_at"]),
             "last_active_at": formatDate(chat["last_active_at"]),
             "last_message": {
@@ -121,71 +69,38 @@ class _ChatListScreenState extends State<ChatListScreen> {
           };
         }).toList();
 
-        /// ✅ 데이터가 변경된 경우에만 업데이트
-        if (!deepEqual(chatRooms, newChatRooms)) {
-          setState(() {
-            chatRooms = newChatRooms;
-          });
-          print("✅ 최신 채팅 목록으로 갱신됨!");
-        } else {
-          print("🔹 데이터 변경 없음 → 갱신하지 않음");
-        }
-      } else {
-        print('❌ 서버 응답 오류: ${response.statusCode}');
+        setState(() {
+          chatRooms = newChatRooms;
+          isChatListEmpty = false; // ✅ 목록이 채워졌으므로 false 설정
+        });
+
+        print("✅ 최신 채팅 목록으로 갱신됨!");
+      } catch (e) {
+        print("⚠️ [ERROR] JSON 변환 실패: $e | 원본 메시지: $message");
       }
+    }, onError: (error) {
+      print("⚠️ WebSocket 오류 발생: $error");
+    });
+  }
+
+
+
+  /// 날짜 형식 변환 함수
+  String formatDate(String? dateTimeString) {
+    if (dateTimeString == null || dateTimeString.isEmpty) return "unknown";
+    try {
+      DateTime dateTime = DateTime.parse(dateTimeString);
+      return DateFormat('MM/dd').format(dateTime);
     } catch (e) {
-      print('⚠️ 네트워크 오류 발생: $e');
+      print("⚠️ 날짜 변환 오류: $e");
+      return "unknown";
     }
   }
-
-  /// 채팅방 나가기 (삭제) 요청
-  Future<void> deleteChat(String chatId, int index) async {
-    final response = await http.delete(
-      Uri.parse('http://yourserver.com/chat/chat/$chatId/delete'),
-    );
-
-    if (response.statusCode == 200) {
-      setState(() {
-        chatRooms.removeAt(index);
-      });
-    } else {
-      print('채팅방 삭제 실패: ${response.statusCode}');
-    }
-  }
-
-  void _leaveChat(int index) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text("채팅방 나가기"),
-          content: Text("${chatRooms[index]["name"]} 채팅방을 나가시겠습니까?"),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: Text("취소"),
-            ),
-            TextButton(
-              onPressed: () {
-                deleteChat(chatRooms[index]["id"], index);
-                Navigator.pop(context);
-              },
-              child: Text("나가기", style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    fetchChatList(); // ✅ 화면이 다시 나타날 때 채팅 목록 갱신
+  void dispose() {
+    channel?.sink.close(status.goingAway); // ✅ WebSocket 안전하게 닫기
+    super.dispose();
   }
 
   @override
@@ -197,8 +112,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
+        scrolledUnderElevation: 0, // 스크롤 시 배경색 변화 방지
       ),
-      body: chatRooms.isEmpty
+      body: chatRooms.isEmpty // ✅ 채팅 목록이 비어있는 경우
           ? Center(
         child: Text(
           "채팅방이 없습니다.",
@@ -216,46 +132,44 @@ class _ChatListScreenState extends State<ChatListScreen> {
               alignment: Alignment.centerRight,
               padding: EdgeInsets.only(right: 20),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     "나가기",
                     style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold),
+                        color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                   SizedBox(width: 10),
                   Icon(Icons.exit_to_app, color: Colors.white),
                 ],
               ),
             ),
-            confirmDismiss: (direction) async {
-              _leaveChat(index);
-              return false;
-            },
             child: ListTile(
+              tileColor: Colors.white,
               leading: CircleAvatar(
-                radius: 24, // 프로필 이미지 크기 조정 가능
-                backgroundColor: Colors.grey[300], // 기본 배경색
+                radius: 24,
+                backgroundColor: Colors.grey[300],
                 backgroundImage: NetworkImage(
                   "${dotenv.env['SERVER_URL']}/image/show_image?character_id=${chatRooms[index]["chat_id"]}",
                 ),
                 onBackgroundImageError: (exception, stackTrace) {
-                  print("⚠️ 이미지 로드 오류: $exception"); // 에러 발생 시 로그 출력
+                  print("⚠️ 이미지 로드 오류: $exception");
                 },
                 child: chatRooms[index]["character_id"] == "unknown_character"
-                    ? Icon(Icons.person, color: Colors.black, size: 30) // 기본 아이콘 표시
-                    : null, // 이미지가 있으면 기본 아이콘 숨김
+                    ? Icon(Icons.person, color: Colors.black, size: 30)
+                    : null,
               ),
               title: Text(chatRooms[index]["nickname"] ?? "알 수 없는 사용자"),
-              subtitle: Text(chatRooms[index]["last_message"]["content"] ?? "메시지가 없습니다."),
+              subtitle: Text(
+                chatRooms[index]["last_message"]?["content"]?.isNotEmpty == true
+                    ? chatRooms[index]["last_message"]["content"]
+                    : "메시지가 없습니다.",
+              ),
               trailing: Text(
                 chatRooms[index]["last_active_at"] ?? "unknown",
                 style: TextStyle(color: Colors.grey),
               ),
               onTap: () async {
-                final previousChatRooms = List<Map<String, dynamic>>.from(chatRooms); // 이전 데이터 저장
-
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -266,14 +180,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   ),
                 );
 
-                fetchChatList().then((_) {
-                  // ✅ 기존 데이터와 다를 때만 1초 후 추가 갱신
-                  if (!deepEqual(previousChatRooms, chatRooms)) {
-                    Future.delayed(Duration(seconds: 1), () {
-                      fetchChatList();
-                    });
-                  }
-                });
               },
             ),
           );

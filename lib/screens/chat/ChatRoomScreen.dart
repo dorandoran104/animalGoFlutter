@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // dotenv 사용
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'ChatListScreen.dart'; // dotenv 사용
 
 class ChatRoomScreen extends StatefulWidget {
   final String chatId; // 서버에서 관리하는 채팅방 ID
@@ -28,18 +30,23 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   List<Map<String, dynamic>> messages = []; // 채팅 내역 리스트
   bool isFetching = false; // API 중복 호출 방지
   bool isSending = false; // 중복 전송 방지
+  WebSocketChannel? channel; // ✅ nullable로 변경
+  late String friendProfileUrl;
 
   /// ✅ 자동 스크롤 함수 (마지막 메시지 위치로 이동)
   void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      Future.delayed(Duration(milliseconds: 100), () {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: Duration(milliseconds: 300), // 부드러운 스크롤 효과
+          duration: Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
-      });
-    }
+        print("📌 [DEBUG] 자동 스크롤 실행됨 (maxScrollExtent: ${_scrollController.position.maxScrollExtent})");
+      } else {
+        print("⚠️ [ERROR] ScrollController가 아직 초기화되지 않음");
+      }
+    });
   }
 
   /// 날짜/시간 포맷 변환 함수 (12시간/24시간 모두 지원)
@@ -93,186 +100,215 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
-  /// 서버에서 채팅 내역 가져오기 (최신 메시지만 반영)
-  Future<void> fetchChatHistory() async {
-    if (isFetching) return; // 중복 호출 방지
-    isFetching = true;
+  /// ✅ `ChatListScreen`의 채팅 목록을 업데이트하는 함수 추가
+  // void updateChatList(String chatId, String lastMessage, String timestamp) {
+  //   // ✅ `ChatListScreen`의 상태를 업데이트하는 글로벌 함수 호출
+  //   ChatListScreen.updateChatList(chatId, lastMessage, timestamp);
+  // }
 
-    try {
-      final response = await http.get(
-        Uri.parse(
-            'http://122.46.89.124:7000/chat/chat/history/${widget.chatId}?user_id=$userId'),
-      );
+  void connectWebSocket() {
+    if (channel != null) return;
+    channel = WebSocketChannel.connect(
+      Uri.parse('ws://122.46.89.124:7000/chat/ws/${widget.chatId}'),
+    );
 
-      if (response.statusCode == 200) {
-        final String utf8String = utf8.decode(response.bodyBytes);
-        final dynamic jsonData = json.decode(utf8String);
+    Stream<dynamic> broadcastStream = channel!.stream.asBroadcastStream();
+    broadcastStream.listen((message) {
+      print("🔹 WebSocket 수신 데이터: $message");
 
-        if (jsonData is Map<String, dynamic> &&
-            jsonData.containsKey("messages")) {
-          List<dynamic> messagesList = jsonData["messages"];
+      try {
+        final Map<String, dynamic> receivedData = jsonDecode(message);
+        print("📌 [DEBUG] JSON 변환 성공: $receivedData");
 
-          List<Map<String, dynamic>> newMessages = messagesList.map<
-              Map<String, dynamic>>((message) {
-            return {
-              "message": message["content"]?.toString() ?? "",
-              "isSentByMe": message["sender"].toString() == userId,
-              "time": formatTimestamp(message["timestamp"]?.toString() ?? ""),
-            };
-          }).toList();
+        setState(() {
+          if (receivedData.containsKey("messages")) {
+            // ✅ 여러 개의 메시지를 포함한 경우
+            List<dynamic> rawMessages = receivedData["messages"];
+            for (var msg in rawMessages) {
+              if (msg["message"] == lastSentMessage && msg["user_id"] == userId) {
+                print("⚠️ [INFO] 내가 보낸 메시지 중복 추가 방지: ${msg["message"]}");
+                continue;
+              }
 
-          if (mounted) {
-            setState(() {
-              messages = newMessages;
-            });
+              // ✅ 기존의 "..." 말풍선이 있다면 교체
+              int placeholderIndex = messages.indexWhere((m) => m["isPlaceholder"] == true);
+              if (placeholderIndex != -1) {
+                messages[placeholderIndex] = {
+                  "message": msg["message"],
+                  "isSentByMe": msg["user_id"] == userId,
+                  "time": formatTimestamp(DateTime.now().toString()),
+                };
+              } else {
+                messages.add({
+                  "message": msg["message"],
+                  "isSentByMe": msg["user_id"] == userId,
+                  "time": formatTimestamp(DateTime.now().toString()),
+                });
 
-            // 🔹 UI가 업데이트된 후 즉시 스크롤 이동
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _scrollToBottom();
-            });
+                // ✅ 채팅 목록 업데이트 (ChatListScreen에 반영)
+                // updateChatList(widget.chatId, msg["message"], DateTime.now().toString());
+              }
+            }
+          } else if (receivedData.containsKey("message") && receivedData.containsKey("user_id")) {
+            if (receivedData["message"] == lastSentMessage && receivedData["user_id"] == userId) {
+              print("⚠️ [INFO] 내가 보낸 메시지 중복 추가 방지: ${receivedData["message"]}");
+              return;
+            }
+
+            // ✅ 기존의 "..." 말풍선을 찾아서 교체
+            int placeholderIndex = messages.indexWhere((m) => m["isPlaceholder"] == true);
+            if (placeholderIndex != -1) {
+              messages[placeholderIndex] = {
+                "message": receivedData["message"],
+                "isSentByMe": receivedData["user_id"] == userId,
+                "time": formatTimestamp(DateTime.now().toString()),
+              };
+            } else {
+              messages.add({
+                "message": receivedData["message"],
+                "isSentByMe": receivedData["user_id"] == userId,
+                "time": formatTimestamp(DateTime.now().toString()),
+              });
+
+              // ✅ 채팅 목록 업데이트 (ChatListScreen에 반영)
+              // updateChatList(widget.chatId, receivedData["message"], DateTime.now().toString());
+            }
           }
-        }
+        });
+
+        print("📌 [DEBUG] UI 업데이트 후 messages 개수: ${messages.length}");
+        _scrollToBottom();
+      } catch (e) {
+        print("⚠️ [ERROR] JSON 변환 실패: $e | 원본 메시지: $message");
       }
-    } catch (e) {
-      print("⚠️ 채팅 내역 가져오기 오류: $e");
-    } finally {
-      isFetching = false;
-    }
+    }, onError: (error) {
+      print("⚠️ WebSocket 오류 발생: $error");
+    });
+    //   broadcastStream.listen((message) {
+    //   print("🔹 WebSocket 수신 데이터: $message");
+    //
+    //   try {
+    //     final Map<String, dynamic> receivedData = jsonDecode(message);
+    //     print("📌 [DEBUG] JSON 변환 성공: $receivedData");
+    //
+    //     setState(() {
+    //       if (receivedData.containsKey("messages")) {
+    //         // ✅ 여러 개의 메시지를 포함한 경우
+    //         List<dynamic> rawMessages = receivedData["messages"];
+    //         for (var msg in rawMessages) {
+    //           if (msg["message"] == lastSentMessage && msg["user_id"] == userId) {
+    //             print("⚠️ [INFO] 내가 보낸 메시지 중복 추가 방지: ${msg["message"]}");
+    //             continue; 0// 내가 보낸 메시지는 추가하지 않음
+    //           }
+    //           messages.add({
+    //             "message": msg["message"],
+    //             "isSentByMe": msg["user_id"] == userId,
+    //             "time": formatTimestamp(DateTime.now().toString()),
+    //           });
+    //         }
+    //       } else if (receivedData.containsKey("message") && receivedData.containsKey("user_id")) {
+    //         // ✅ 단일 메시지가 올 경우
+    //         if (receivedData["message"] == lastSentMessage && receivedData["user_id"] == userId) {
+    //           print("⚠️ [INFO] 내가 보낸 메시지 중복 추가 방지: ${receivedData["message"]}");
+    //           return; // 내가 보낸 메시지는 추가하지 않음
+    //         }
+    //         messages.add({
+    //           "message": receivedData["message"],
+    //           "isSentByMe": receivedData["user_id"] == userId,
+    //           "time": formatTimestamp(DateTime.now().toString()),
+    //         });
+    //       }
+    //
+    //     });
+    //
+    //     print("📌 [DEBUG] UI 업데이트 후 messages 개수: ${messages.length}");
+    //     _scrollToBottom();
+    //   } catch (e) {
+    //     print("⚠️ [ERROR] JSON 변환 실패: $e | 원본 메시지: $message");
+    //   }
+    // }, onError: (error) {
+    //   print("⚠️ WebSocket 오류 발생: $error");
+    // });
   }
 
-  /// 메시지 전송 함수 (Optimistic Update 적용)
-  Future<void> sendMessage() async {
-    if (_messageController.text.isEmpty || isSending) return;
+
+  String lastSentMessage = ""; // 마지막으로 보낸 메시지 저장
+
+  void sendMessage() {
+    if (_messageController.text.isEmpty || channel == null) return;
     isSending = true;
 
     String messageText = _messageController.text;
-    DateTime now = DateTime.now();
-    String messageTime = DateFormat("yyyy-MM-dd HH:mm:ss").format(now);
-
-    List<String> chatParts = widget.chatId.split("-");
-    String characId = chatParts.length > 1 ? chatParts[1] : "";
-
-    print("🟡 sendMessage() - 현재 chatId: ${widget.chatId}");
-    print("🟡 sendMessage() - 분리된 characId: $characId"); // 🔍 여기서 dog006이 나오는지 확인
-
-    // 🔹 1. Optimistic UI (전송 중 UI 먼저 업데이트)
-    Map<String, dynamic> tempMessage = {
+    lastSentMessage = messageText; // 마지막 보낸 메시지 저장
+    Map<String, dynamic> messagePayload = {
+      "user_id": userId,
       "message": messageText,
-      "isSentByMe": true,
-      "time": formatTimestamp(messageTime),
-      "isPending": true, // 전송 중 표시
     };
 
+
+    // ✅ Optimistic UI - 사용자 입력을 즉시 UI에 반영
     setState(() {
-      messages.add(tempMessage);
+      messages.add({
+        "message": messageText,
+        "isSentByMe": true,
+        "time": formatTimestamp(DateTime.now().toString()),
+      });
+
+      // ✅ 상대방 메시지가 오기 전에 "..." 말풍선 추가
+      messages.add({
+        "message": "...", // 플레이스홀더 메시지
+        "isSentByMe": false,
+        "time": "", // 시간은 비워둠
+        "isPlaceholder": true, // 플레이스홀더임을 나타내는 필드 추가
+      });
+
       _scrollToBottom();
     });
 
     _messageController.clear();
 
-    // 🔹 2. 서버에 메시지 전송
-    Uri url = Uri.parse(
-      'http://122.46.89.124:7000/chat/send_message'
-          '?user_input=${Uri.encodeComponent(messageText)}'
-          '&user_id=$userId'
-          '&charac_id=$characId',
-    );
-
-    print("🟡 sendMessage() - 전송 요청 URL: $url"); // 최종 URL 확인
-
     try {
-      final response = await http.post(
-        url,
-        headers: {"Content-Type": "application/json"},
-      );
-
-      if (response.statusCode == 200) {
-        print("✅ 메시지 전송 성공");
-        Future.delayed(Duration(seconds: 2), () {
-          print("🔄 2초 후에 상대방 메시지 가져오기...");
-          fetchChatHistory(); // 상대방 메시지 불러오기
-        });
-
-      } else {
-        print('❌ 메시지 전송 실패: ${response.statusCode} | 응답: ${response.body}');
-      }
+      channel?.sink.add(jsonEncode(messagePayload));
+      print("✅ WebSocket 메시지 전송 완료: $messageText");
     } catch (e) {
-      print("⚠️ 네트워크 오류: $e");
+      print("⚠️ WebSocket 메시지 전송 오류: $e");
     } finally {
       isSending = false;
     }
   }
-  // ✅ 새로운 메시지가 도착하면 호출 (서버에서 WebSocket 또는 Push 방식 추천)
-  Future<void> onNewMessageReceived() async {
-    if (isFetching) return; // 중복 호출 방지
-    await fetchChatHistory();
-  }
 
-  String friendNickname = ""; // 상대방 닉네임 저장 변수
-  String friendProfileUrl = ""; // 상대방 프로필 사진 URL 저장 변수
-
-  Future<void> fetchChatRoomInfo() async {
-    print("🟢 fetchChatRoomInfo() 실행됨!");
-    try {
-      final response = await http.get(
-        Uri.parse('http://122.46.89.124:7000/chat/chat/list/$userId'),
-      );
-
-      if (response.statusCode == 200) {
-        final String utf8String = utf8.decode(response.bodyBytes);
-        final dynamic jsonData = json.decode(utf8String);
-
-        print("📥 서버 응답 데이터 (채팅 목록): $jsonData");
-
-        if (jsonData is Map<String, dynamic> && jsonData.containsKey("chats")) {
-          for (var chat in jsonData["chats"]) {
-            print("🔍 개별 채팅방 데이터: $chat");
-
-            if (chat["chat_id"] == widget.chatId) {
-              setState(() {
-                friendNickname = chat["nickname"] ?? "알 수 없는 사용자";
-                friendProfileUrl =
-                "${dotenv.env['SERVER_URL']}/image/show_image?character_id=${widget.chatId}";
-              });
-
-              print("✅ chat_id: ${widget.chatId}");
-              print("✅ friendProfileUrl: $friendProfileUrl");
-
-              if (friendProfileUrl.isEmpty) {
-                print("⚠️ friendProfileUrl이 빈 값입니다! 서버에서 데이터를 확인하세요.");
-              }
-              break;
-            }
-          }
-        } else {
-          print("❌ 서버 응답 데이터에 'chats' 키가 없습니다!");
-        }
-      } else {
-        print("❌ 서버 응답 오류: ${response.statusCode}");
+  void _forceScrollToBottom() {
+    Future.delayed(Duration(milliseconds: 500), () {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        print("📌 [DEBUG] 1차 스크롤 실행 (500ms 후)");
       }
-    } catch (e) {
-      print("⚠️ 채팅방 정보 가져오기 오류: $e");
-    }
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+          print("📌 [DEBUG] 2차 스크롤 실행 (500ms 후)");
+        }
+      });
+    });
   }
-
-
 
 
   @override
   void initState() {
     super.initState();
-    initializeDateFormatting('ko_KR', null);
-    // 🔹 채팅 내역을 불러오고 즉시 스크롤
-    fetchChatRoomInfo();
-    fetchChatHistory().then((_) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToBottom();
-      });
-    });
+    // ✅ 서버에서 프로필 이미지 URL 가져오기
+    friendProfileUrl =
+    "${dotenv.env['SERVER_URL']}/image/show_image?character_id=${widget.chatId}";
+    connectWebSocket();
+    // ✅ UI 빌드 후 메시지 리스트가 로드될 때까지 기다림
+    // ✅ 강제 스크롤 실행
+    _forceScrollToBottom();
   }
+
 
   @override
   void dispose() {
+    channel?.sink.close(1000); // ✅ null check 후 안전하게 닫기
     _scrollController.dispose();
     _messageController.dispose();
     super.dispose();
@@ -289,6 +325,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         backgroundColor: Colors.white,
         appBar: AppBar(
           backgroundColor: Colors.white,
+          elevation: 0, // 그림자 제거 (그림자로 인해 회색처럼 보일 가능성 방지)
+          scrolledUnderElevation: 0, // 스크롤 시 배경색 변화 방지
           foregroundColor: Colors.black,
           titleSpacing: 0, // 🔹 왼쪽 여백 제거
           leading: IconButton(
@@ -317,7 +355,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               // 🔹 닉네임
               Expanded(
                 child: Text(
-                  friendNickname.isNotEmpty ? friendNickname : widget.friendName,
+                  widget.friendName.isNotEmpty ? widget.friendName : widget.friendName,
                   overflow: TextOverflow.ellipsis, // 닉네임 길 경우 줄임
                   style: TextStyle(fontSize: 18),
                 ),
@@ -333,69 +371,71 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 controller: _scrollController,
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
-                  bool isSentByMe = messages[index]["isSentByMe"] == true;
+                  var messageData = messages[index];
+                  var message = messageData["message"];
+                  var isSentByMe = messageData["isSentByMe"];
+                  var time = messageData["time"];
 
                   return Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: isSentByMe
-                          ? MainAxisAlignment.end
-                          : MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment:
+                      isSentByMe ? MainAxisAlignment.end : MainAxisAlignment.start,
                       children: [
                         // ✅ 상대방 메시지일 경우 프로필 사진 표시
                         if (!isSentByMe)
                           Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: CircleAvatar(
-                              radius: 20, // 프로필 사진 크기
-                              backgroundColor: Colors.grey[300], // 기본 배경색
-                              backgroundImage: NetworkImage(friendProfileUrl), // 서버 이미지
+                              radius: 20,
+                              backgroundColor: Colors.grey[300],
+                              backgroundImage: NetworkImage(friendProfileUrl),
                               onBackgroundImageError: (exception, stackTrace) {
-                                print("확인 : $friendProfileUrl");
                                 print("⚠️ 프로필 이미지 로딩 오류: $exception");
-                                setState(() {
-                                  friendProfileUrl = ""; // 오류 발생 시 기본 아이콘 표시
-                                });
                               },
                               child: friendProfileUrl.isEmpty
                                   ? Icon(Icons.person, color: Colors.black, size: 30)
                                   : null,
                             ),
                           ),
-                        // ✅ 말풍선과 시간 표시
+
+                        // ✅ 내가 보낸 메시지일 경우 [시간] [말풍선] 순서
+                        if (isSentByMe)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Text(
+                              time,
+                              style: const TextStyle(color: Colors.black54, fontSize: 10),
+                            ),
+                          ),
+
+                        // ✅ 말풍선 (Flexible 사용하여 가로폭 초과 방지)
                         Flexible(
-                          child: Column(
-                            crossAxisAlignment:
-                            isSentByMe
-                                ? CrossAxisAlignment.end
-                                : CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: isSentByMe ? Colors.blueAccent : Colors
-                                      .grey[300],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  messages[index]["message"]!,
-                                  style: TextStyle(
-                                    color: isSentByMe ? Colors.white : Colors
-                                        .black,
-                                  ),
-                                ),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isSentByMe ? Colors.blueAccent : Colors.grey[300],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              message,
+                              style: TextStyle(
+                                color: isSentByMe ? Colors.white : Colors.black,
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                messages[index]["time"]!,
-                                style: const TextStyle(
-                                    color: Colors.black54, fontSize: 10),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
+
+                        // ✅ 상대방 메시지일 경우 [말풍선] [시간] 순서
+                        if (!isSentByMe)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: Text(
+                              time,
+                              style: const TextStyle(color: Colors.black54, fontSize: 10),
+                            ),
+                          ),
                       ],
                     ),
                   );
