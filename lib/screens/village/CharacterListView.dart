@@ -3,12 +3,15 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'Animal.dart';
 import 'dart:async';
 import 'dart:math';
+
 class CharacterListView extends StatefulWidget {
   final List<Animal> characters;
+  final Animal? playerCharacter; // ✅ 플레이어 캐릭터 추가
 
   const CharacterListView({
     Key? key,
     required this.characters,
+    this.playerCharacter, // ✅ 추가
   }) : super(key: key);
 
   @override
@@ -20,27 +23,30 @@ class _CharacterListViewState extends State<CharacterListView> with SingleTicker
   Widget build(BuildContext context) {
     return Stack(
       children: widget.characters.map((character) {
+        final isPlayer = character.isPlayer; // 플레이어 캐릭터 여부 확인
         return AnimatedPositioned(
-          duration: Duration(milliseconds: 16),
+          duration: const Duration(milliseconds: 16),
           curve: Curves.linear,
           left: character.x,
           top: character.y,
           child: GestureDetector(
             onTap: () {
-              print('Character clicked: ${character.nickname}');
+              print('${isPlayer ? "Player" : "Character"} clicked: ${character.nickname}');
             },
             child: Container(
-              width: 50,
-              height: 50,
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundImage: NetworkImage(
-                      '${dotenv.env['SERVER_URL']}/image/show_image?character_id=${character.character_id}'
-                    ),
-                  ),
-                ],
+              width: isPlayer ? 60 : 50, // 플레이어 캐릭터 크기 키움
+              height: isPlayer ? 60 : 50,
+              decoration: isPlayer
+                  ? BoxDecoration(
+                border: Border.all(color: Colors.blueAccent, width: 3), // 파란 테두리
+                shape: BoxShape.circle,
+              )
+                  : null,
+              child: CircleAvatar(
+                radius: isPlayer ? 25 : 20,
+                backgroundImage: isPlayer
+                    ? const AssetImage('assets/images/char1.png') as ImageProvider
+                    : NetworkImage('${dotenv.env['SERVER_URL']}/image/show_image?character_id=${character.character_id}') as ImageProvider,
               ),
             ),
           ),

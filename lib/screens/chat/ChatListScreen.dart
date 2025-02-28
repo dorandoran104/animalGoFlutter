@@ -7,7 +7,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../components/BottomBar.dart';
 import '../home/HomeScreen.dart';
 import '../myPage/my_page.dart';
-import '../village/VillageScreen.dart';
+import '../village_test/Village.dart';
 import 'ChatRoomScreen.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -84,7 +84,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
 
-
   /// 날짜 형식 변환 함수
   String formatDate(String? dateTimeString) {
     if (dateTimeString == null || dateTimeString.isEmpty) return "unknown";
@@ -150,7 +149,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 radius: 24,
                 backgroundColor: Colors.grey[300],
                 backgroundImage: NetworkImage(
-                  "${dotenv.env['SERVER_URL']}/image/show_image?character_id=${chatRooms[index]["chat_id"]}",
+                  "${dotenv
+                      .env['SERVER_URL']}/image/show_image?character_id=${chatRooms[index]["chat_id"]}",
                 ),
                 onBackgroundImageError: (exception, stackTrace) {
                   print("⚠️ 이미지 로드 오류: $exception");
@@ -173,13 +173,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ChatRoomScreen(
-                      chatId: chatRooms[index]["chat_id"] ?? "unknown_id",
-                      friendName: chatRooms[index]["nickname"] ?? "알 수 없는 사용자",
-                    ),
+                    builder: (context) =>
+                        ChatRoomScreen(
+                          chatId: chatRooms[index]["chat_id"] ?? "unknown_id",
+                          friendName: chatRooms[index]["nickname"] ??
+                              "알 수 없는 사용자",
+                        ),
                   ),
                 );
-
               },
             ),
           );
@@ -209,12 +210,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 ),
               );
               break;
-            case 2:
+            case 2: // ✅ 채팅 리스트 화면으로 이동
               Navigator.pushReplacement(
                 context,
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secondaryAnimation) =>
-                      ChatListScreen(),
+                      ChatListScreen(), // ✅ userId 전달 제거
                   transitionDuration: Duration.zero,
                 ),
               );

@@ -109,10 +109,18 @@ flutter:
     - assets/images/background.jpg
     - assets/images/backgroundv1.jpg
     - assets/images/backgroundv2.png
+    - assets/images/char1.png
     - assets/images/google.webp
     - assets/images/kakao.png
     - assets/images/naver.png
     - assets/.env
+  fonts:
+    - family: Galmuri-bold
+      fonts:
+        - asset: assets/fonts/Galmuri11-Bold.ttf
+    - family: Galmuri9
+      fonts:
+        - asset: assets/fonts/Galmuri9.ttf
 
   
   #   - images/a_dot_ham.jpeg

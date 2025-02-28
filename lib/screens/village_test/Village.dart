@@ -21,6 +21,9 @@ class _VillageScreenState extends State<VillageScreen> {
   double characterY = 0;
   double speed = 5.0;
 
+  double get playerAbsoluteX => characterX + MediaQuery.of(context).size.width / 2 - 25;
+  double get playerAbsoluteY => characterY + MediaQuery.of(context).size.height / 2 - 25;
+
   List<Map<String, dynamic>> characters = [];
   List<bool> isPaused = []; // 캐릭터 멈춤 여부
   List<Map<String, dynamic>> speechBubbles = []; // 말풍선 리스트
@@ -38,111 +41,219 @@ class _VillageScreenState extends State<VillageScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      double screenWidth = MediaQuery.of(context).size.width;
+      double screenHeight = MediaQuery.of(context).size.height;
 
-    // 5개의 캐릭터를 초기 위치와 이미지로 배치
-    for (int i = 0; i < 6; i++) {
-      characters.add({
-        'x': random.nextDouble() * screenWidth,
-        'y': random.nextDouble() * screenHeight,
-        'direction': "right", // 초기 방향
-        'sprite': characterSprites[i], // 캐릭터
-      });
-      isPaused.add(false); // 초기에는 모두 움직일 수 있도록 설정
-    }
+      for (int i = 0; i < 6; i++) {
+        double initialX = getRandomX(screenWidth);
+        double initialY = getRandomY(screenHeight);
+        characters.add({
+          'x': initialX, // 목표 X 좌표
+          'y': initialY, // 목표 Y 좌표
+          'currentX': initialX, // 현재 X 좌표
+          'currentY': initialY, // 현재 Y 좌표
+          'prevX': initialX, // 이전 X 좌표
+          'prevY': initialY, // 이전 Y 좌표
+          'direction': "right",
+          'sprite': characterSprites[i],
+          'moveDuration': 3000, // 이동에 걸리는 시간 (밀리초)
+          'elapsedTime': 0, // 경과 시간
+          'speed': 100.0, // 초당 이동 거리 (픽셀)
+        });
+        isPaused.add(false);
+      }});
 
-    // 일정 시간마다 캐릭터의 위치를 랜덤 변경 + 방향 변경
-    Timer.periodic(Duration(seconds: random.nextInt(6) + 3), (timer) {// 3~8초 랜덤
-      setState(() {
-        for (int i = 0; i < characters.length; i++) {
-          if (!isPaused[i]) { // 멈춰있는 캐릭터는 이동하지 않음
-            double newX = random.nextDouble() *
-                (screenWidth - 50); // 50은 캐릭터 크기
-            double newY = random.nextDouble() * (screenHeight - 50);
+    // 단일 타이머로 목표 좌표 설정 및 보간 처리
+    Timer.periodic(Duration(milliseconds: 16), (timer) { // 약 60fps
+      if (mounted) {
+        setState(() {
+          double screenWidth = MediaQuery.of(context).size.width;
+          double screenHeight = MediaQuery.of(context).size.height;
 
-            // 방향 결정 (왼쪽/오른쪽 비교)
-            String newDirection = newX < characters[i]['x'] ? "left" : "right";
+          for (int i = 0; i < characters.length; i++) {
+            if (!isPaused[i]) {
+              var char = characters[i];
+              int currentTime = DateTime.now().millisecondsSinceEpoch;
 
-            characters[i]['x'] = newX;
-            characters[i]['y'] = newY;
-            characters[i]['direction'] = newDirection;
+              // 이동 완료 시 새 목표 설정
+              if (char['elapsedTime'] >= char['moveDuration']) {
+                char['prevX'] = char['currentX'];
+                char['prevY'] = char['currentY'];
+                char['x'] = getRandomX(screenWidth);
+                char['y'] = getRandomY(screenHeight);
+                char['elapsedTime'] = 0;
+
+                // 방향 설정
+                char['direction'] = char['x'] > char['currentX'] ? "right" : "left";
+
+                // 새 목표까지의 거리에 따라 이동 시간 계산
+                double dx = char['x'] - char['currentX'];
+                double dy = char['y'] - char['currentY'];
+                double distance = sqrt(dx * dx + dy * dy);
+                char['moveDuration'] = (distance / char['speed'] * 1000).toInt();
+              }
+
+              // 선형 보간으로 부드럽게 이동
+              double progress = char['elapsedTime'] / char['moveDuration'];
+              char['currentX'] = char['prevX'] + (char['x'] - char['prevX']) * progress.clamp(0.0, 1.0);
+              char['currentY'] = char['prevY'] + (char['y'] - char['prevY']) * progress.clamp(0.0, 1.0);
+              char['elapsedTime'] += 16; // 프레임당 경과 시간 증가
+            }
           }
-        }
-        // 충돌 감지
-        _checkCollisions();
-      });
+          _checkPlayerCollision();
+        });
+      }
     });
   }
+
+  double getRandomX(double screenWidth) {
+    return random.nextDouble() * (screenWidth - 50);
+  }
+
+  double getRandomY(double screenHeight) {
+    return random.nextDouble() * (screenHeight - 50);
+  }
+
+  void _updateCharacterPositions() {
+    for (int i = 0; i < characters.length; i++) {
+      double progress = 0.5; // 🔥 이동 중간 위치를 사용
+      characters[i]['currentX'] = getCurrentPosition(characters[i]['prevX'], characters[i]['x'], progress);
+      characters[i]['currentY'] = getCurrentPosition(characters[i]['prevY'], characters[i]['y'], progress);
+    }
+  }
+
+  // 위치 업데이트 메서드 수정
   void _updatePosition(StickDragDetails details) {
     setState(() {
       characterX += details.x * speed;
       characterY += details.y * speed;
+
+      // 플레이어가 화면 밖으로 나가지 않도록 제한
+      double screenWidth = MediaQuery.of(context).size.width;
+      double screenHeight = MediaQuery.of(context).size.height;
+      characterX = characterX.clamp(-screenWidth / 2 + 25, screenWidth / 2 - 25);
+      characterY = characterY.clamp(-screenHeight / 2 + 25, screenHeight / 2 - 25);
     });
+    _checkPlayerCollision(); // 충돌 감지 실행
+  }
+
+  double getCurrentPosition(double start, double end, [double progress = 0.5]) {
+    return start + (end - start) * progress;
   }
   /// ✅ 충돌 감지 및 멈춤 처리
-  void _checkCollisions() {
+  Set<int> detectedCharacters = {};
+
+  void _checkPlayerCollision() {
+    // 플레이어의 절대 좌표 계산 (화면 좌측 상단 기준)
+    double screenWidth = MediaQuery.of(context).size.width;
+    double screenHeight = MediaQuery.of(context).size.height;
+    double adjustedCharacterX = screenWidth / 2 + characterX; // 중심점
+    double adjustedCharacterY = screenHeight / 2 + characterY; // 중심
+
+    // print("플레이어 위치: ($adjustedCharacterX, $adjustedCharacterY)");
+
     for (int i = 0; i < characters.length; i++) {
-      for (int j = i + 1; j < characters.length; j++) {
-        if (_isColliding(i, j)) {
-          _pauseCharacters(i, j);
+      // NPC 캐릭터의 실시간 절대 좌표 사용
+      double realX = characters[i]['currentX'];
+      double realY = characters[i]['currentY'];
+      // print("NPC[$i] 위치: ($realX, $realY)");
+
+      // 거리 계산
+      double dx = adjustedCharacterX - realX;
+      double dy = adjustedCharacterY - realY;
+      double distance = sqrt(dx * dx + dy * dy);
+      // print("NPC[$i]와의 거리: $distance");
+
+      // 충돌 감지 범위 (50으로 설정)
+      if (distance < 50) {
+        if (!detectedCharacters.contains(i)) {
+          detectedCharacters.add(i);
+          _showInteractionDialog(i);
         }
+      } else {
+        detectedCharacters.remove(i);
       }
     }
   }
-  /// ✅ 두 캐릭터가 충돌했는지 확인
-  bool _isColliding(int i, int j) {
-    double dx = (characters[i]['x']! - characters[j]['x']!).abs();
-    double dy = (characters[i]['y']! - characters[j]['y']!).abs();
-    return dx < 50 && dy < 50; // 캐릭터 크기(50px) 이내면 충돌
-  }
-  /// ✅ 충돌한 캐릭터를 n초 동안 멈추게 한 후, 말풍선 표시
-  void _pauseCharacters(int i, int j) {
-    if (!isPaused[i] && !isPaused[j]) {
-      setState(() {
-        isPaused[i] = true;
-        isPaused[j] = true;
-      });
-      // ✅ 충돌 후 n초 동안 멈추게 함 (6초)
-      Future.delayed(Duration(seconds: 6), () {
-        setState(() {
-          isPaused[i] = false;
-          isPaused[j] = false;
-          _showSpeechBubbles(i, j);
-        });
-      });
-    }
-  }
-  /// ✅ 충돌 시 두 캐릭터 모두 말풍선을 띄우도록 수정
-  void _showSpeechBubbles(int i, int j) {
-    String bubbleId1 = "${i}_${DateTime.now().millisecondsSinceEpoch}"; // 캐릭터 1의 말풍선 ID
-    String bubbleId2 = "${j}_${DateTime.now().millisecondsSinceEpoch}"; // 캐릭터 2의 말풍선 ID
 
-    List<String> messages = ["안녕!", "반가워!", "좋은 날이야!", "뭐해?", "같이 놀자!", "재밌겠다!"];
-    String message1 = messages[random.nextInt(messages.length)];
-    String message2 = messages[random.nextInt(messages.length)];
-
+  /// ✅ 채팅하기 동작
+  void _startChat(int characterIndex) {
     setState(() {
       speechBubbles.add({
-        'id': bubbleId1,
-        'x': characters[i]['x'], // 첫 번째 캐릭터 위치
-        'y': characters[i]['y'] - 40,
-        'message': message1, // 말풍선 메시지
-      });
-      speechBubbles.add({
-        'id': bubbleId2,
-        'x': characters[j]['x'], // 두 번째 캐릭터 위치
-        'y': characters[j]['y'] - 40,
-        'message': message2, // 말풍선 메시지
+        'id': "player_chat_${DateTime.now().millisecondsSinceEpoch}",
+        'x': characters[characterIndex]['currentX'], // NPC의 실시간 X 좌표
+        'y': characters[characterIndex]['currentY'] - 50, // NPC 위에 표시
+        'message': "안녕! 대화하자!",
       });
     });
 
-    // ✅ n초 후 말풍선 삭제
     Future.delayed(Duration(seconds: 3), () {
       setState(() {
-        speechBubbles.removeWhere((bubble) => bubble['id'] == bubbleId1 || bubble['id'] == bubbleId2);
+        speechBubbles.removeWhere((bubble) => bubble['id'].toString().startsWith("player_chat"));
       });
     });
   }
 
+  /// ✅ 쓰다듬기 동작
+  void _petCharacter(int characterIndex) {
+    setState(() {
+      speechBubbles.add({
+        'id': "player_pet_${DateTime.now().millisecondsSinceEpoch}",
+        'x': characters[characterIndex]['currentX'], // NPC의 실시간 X 좌표
+        'y': characters[characterIndex]['currentY'] - 40, // NPC 위에 표시
+        'message': "🤗 기분 좋아 보이네!",
+      });
+    });
+
+    Future.delayed(Duration(seconds: 3), () {
+      setState(() {
+        speechBubbles.removeWhere((bubble) => bubble['id'].toString().startsWith("player_pet"));
+      });
+    });
+  }
+
+  /// ✅ 플레이어 충돌 시 선택 UI 표시
+  bool isDialogOpen = false; // 다이얼로그 중복 실행 방지
+
+  void _showInteractionDialog(int characterIndex) {
+    if (isDialogOpen) return; // 🔥 이미 다이얼로그가 떠 있으면 실행 안 함
+
+    isDialogOpen = true; // 다이얼로그 열림 상태 변경
+
+    print("🛠 다이얼로그 실행 시도! 캐릭터[$characterIndex]");
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("무엇을 할까요?"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _startChat(characterIndex); // 채팅 시작
+                },
+                child: Text("💬 채팅하기"),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _petCharacter(characterIndex); // 쓰다듬기 동작
+                },
+                child: Text("🤗 쓰다듬기"),
+              ),
+            ],
+          ),
+        );
+      },
+    ).then((_) {
+      isDialogOpen = false; // 다이얼로그가 닫힐 때 상태 변경
+      print("🛠 다이얼로그가 닫혔습니다.");
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -192,12 +303,11 @@ class _VillageScreenState extends State<VillageScreen> {
 
           // 캐릭터들을 랜덤하게 배치
           for (int i = 0; i < characters.length; i++)
-            AnimatedPositioned(
-              duration: Duration(seconds: 6),
-              left: characters[i]['x']!,
-              top: characters[i]['y']!,
+            Positioned(
+              left: characters[i]['currentX'],
+              top: characters[i]['currentY'],
               child: Image.asset(
-                characters[i]['sprite'][characters[i]['direction']]!, // 왼쪽/오른쪽 이미지 선택
+                characters[i]['sprite'][characters[i]['direction']]!,
                 width: 50,
                 height: 50,
               ),
@@ -273,41 +383,41 @@ class _VillageScreenState extends State<VillageScreen> {
       ),
     );
   }
-  ///✅ 말풍선 UI
-  // Widget _Joystick_menual(BuildContext context) {
-  //   return Scaffold(
-  //     backgroundColor: Colors.white,
-  //     body: Stack(
-  //       children: [
-  //         // ✅ 캐릭터 (파란색 원)
-  //         Positioned(
-  //           left: characterX + MediaQuery.of(context).size.width / 2 - 25,
-  //           top: characterY + MediaQuery.of(context).size.height / 2 - 25,
-  //           child: Container(
-  //             width: 50,
-  //             height: 50,
-  //             decoration: BoxDecoration(
-  //               color: Colors.blue,
-  //               shape: BoxShape.circle,
-  //             ),
-  //           ),
-  //         ),
-  //
-  //         // ✅ Joystick 추가 (화면 왼쪽 하단)
-  //         Align(
-  //           alignment: Alignment.bottomLeft,
-  //           child: Padding(
-  //             padding: const EdgeInsets.all(32.0),
-  //             child: Joystick(
-  //               mode: JoystickMode.all, // 모든 방향 가능 (상하좌우 + 대각선)
-  //               listener: (details) {
-  //                 _updatePosition(details);
-  //               },
-  //             ),
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
+///✅ 말풍선 UI
+// Widget _Joystick_menual(BuildContext context) {
+//   return Scaffold(
+//     backgroundColor: Colors.white,
+//     body: Stack(
+//       children: [
+//         // ✅ 캐릭터 (파란색 원)
+//         Positioned(
+//           left: characterX + MediaQuery.of(context).size.width / 2 - 25,
+//           top: characterY + MediaQuery.of(context).size.height / 2 - 25,
+//           child: Container(
+//             width: 50,
+//             height: 50,
+//             decoration: BoxDecoration(
+//               color: Colors.blue,
+//               shape: BoxShape.circle,
+//             ),
+//           ),
+//         ),
+//
+//         // ✅ Joystick 추가 (화면 왼쪽 하단)
+//         Align(
+//           alignment: Alignment.bottomLeft,
+//           child: Padding(
+//             padding: const EdgeInsets.all(32.0),
+//             child: Joystick(
+//               mode: JoystickMode.all, // 모든 방향 가능 (상하좌우 + 대각선)
+//               listener: (details) {
+//                 _updatePosition(details);
+//               },
+//             ),
+//           ),
+//         ),
+//       ],
+//     ),
+//   );
+// }
 }

@@ -14,6 +14,7 @@ class Animal {
   final String status;
   final String userId;
   final String character_id;
+  bool isPlayer; // ✅ 새로운 속성 추가
 
   Animal({
     required this.x,
@@ -26,7 +27,8 @@ class Animal {
     required this.personality,
     required this.status,
     required this.userId,
-    required this.character_id
+    required this.character_id,
+    this.isPlayer = false, // ✅ 생성자에서 기본값 설정
   });
 
 factory Animal.fromJson(Map<String, dynamic> json, {Size? screenSize, double containerSize = 40.0}) {
@@ -53,7 +55,8 @@ factory Animal.fromJson(Map<String, dynamic> json, {Size? screenSize, double con
     personality: json['personality'] ?? '',
     status: json['status'] ?? '',
     userId: json['user_id'] ?? '',
-    character_id: json["character_id"] ?? ""
+    character_id: json["character_id"] ?? "",
+    isPlayer: json['is_player'] ?? false
   );
 }
 }
