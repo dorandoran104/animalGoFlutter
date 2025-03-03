@@ -23,6 +23,15 @@ class _GameScreenState extends State<GameScreen> {
   StreamSubscription? _subscription;
   Set<String> _activeCollisions = {};
   bool _isWebSocketConnected = false;
+  List<Rect> blockedZones = [
+    Rect.fromLTWH(0.51, 0.0001, 0.037, 0.6333), //가운대 선
+    Rect.fromLTWH(0.00001, 0.000001, 0.99999, 0.333), // 위
+    Rect.fromLTWH(0.00001, 0.69999, 0.99999, 0.99999), // 아래
+  ];
+
+  Offset _relativePosition = Offset.zero;
+  final GlobalKey _imageKey = GlobalKey();
+  Size _imageSize = Size.zero;
 
   // 움직임 관련 변수들
   late Timer _movementTimer;
@@ -41,7 +50,7 @@ class _GameScreenState extends State<GameScreen> {
   ];
 
   void _connectWebSocket() {
-    if(_isWebSocketConnected) return;
+    if (_isWebSocketConnected) return;
 
     var wsUrl = dotenv.env['WS_URL'] ?? 'ws://122.46.89.124:7000/ws';
     wsUrl += '/1';
@@ -64,13 +73,12 @@ class _GameScreenState extends State<GameScreen> {
         _isWebSocketConnected = false;
       },
     );
-
     _isWebSocketConnected = true;
   }
 
   Future<void> _getCharacters() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('cookie');
+    final token = prefs.getString('cookie') ?? 1;
     try {
       Dio dio = Dio(
         BaseOptions(
@@ -80,11 +88,13 @@ class _GameScreenState extends State<GameScreen> {
       );
       var response = await dio.get("/village/get_characters/${token}");
       if (response.statusCode == 200 && response.data["result"]) {
-        Map<String, dynamic> responseMap = response.data as Map<String, dynamic>;
+        Map<String, dynamic> responseMap =
+            response.data as Map<String, dynamic>;
         List<dynamic> data = responseMap["character_list"];
         setState(() {
           characterList = data.map((json) {
-            final animal = Animal.fromJson(json, screenSize: MediaQuery.of(context).size);
+            final animal =
+                Animal.fromJson(json, screenSize: MediaQuery.of(context).size);
 
             print("Created animal: ${animal.nickname}");
             return animal;
@@ -108,8 +118,11 @@ class _GameScreenState extends State<GameScreen> {
     super.initState();
     _getCharacters();
     _connectWebSocket();
+    startMove();
+  }
 
-  //   // 60fps: 약 16ms마다 위치 업데이트 (화면 사이즈는 캐릭터 컨테이너 50x50 기준)
+  void startMove() {
+    //   // 60fps: 약 16ms마다 위치 업데이트 (화면 사이즈는 캐릭터 컨테이너 50x50 기준)
     _movementTimer = Timer.periodic(Duration(milliseconds: 16), (timer) {
       if (!_isPaused && characterList.isNotEmpty && _velocities.isNotEmpty) {
         setState(() {
@@ -128,18 +141,32 @@ class _GameScreenState extends State<GameScreen> {
                   _activeCollisions.add(pairKey);
                   final collisionData = {
                     'event': 'collision',
-                    'pairKey' : pairKey,
+                    'pairKey': pairKey,
                     'characters': [
-                      {'id':a.character_id, 'nickname': a.nickname, 'x': a.x, 'y': a.y, 'animaltype' : a.animalType, 'personality' : a.personality},
-                      {'id' : b.character_id, 'nickname': b.nickname, 'x': b.x, 'y': b.y, 'animaltype' : b.animalType, 'personality' : b.personality},
+                      {
+                        'id': a.character_id,
+                        'nickname': a.nickname,
+                        'x': a.x,
+                        'y': a.y,
+                        'animaltype': a.animalType,
+                        'personality': a.personality
+                      },
+                      {
+                        'id': b.character_id,
+                        'nickname': b.nickname,
+                        'x': b.x,
+                        'y': b.y,
+                        'animaltype': b.animalType,
+                        'personality': b.personality
+                      },
                     ],
                   };
                   channel.sink.add(jsonEncode(collisionData));
                   // print("Collision detected between ${a.nickname} and ${b.nickname}");
                 }
-                // 충돌 시 해당 캐릭터들의 이동 정지
-                _velocities[i] = Offset.zero;
-                _velocities[j] = Offset.zero;
+                // // 충돌 시 해당 캐릭터들의 이동 정지
+                // _velocities[i] = Offset.zero;
+                // _velocities[j] = Offset.zero;
               }
             }
           }
@@ -147,24 +174,54 @@ class _GameScreenState extends State<GameScreen> {
           final screenSize = MediaQuery.of(context).size;
           final maxX = screenSize.width - 50;
           final maxY = screenSize.height - 50;
+          
           for (var i = 0; i < count; i++) {
-            characterList[i].x += _velocities[i].dx;
-            characterList[i].y += _velocities[i].dy;
+            final newX = characterList[i].x + _velocities[i].dx;
+            final newY = characterList[i].y + _velocities[i].dy;
+
+            // 블록된 영역과의 충돌 체크
+            bool isBlocked = false;
+            
+            for (var zone in blockedZones) {
+            final scaledZone = Rect.fromLTRB(
+              zone.left * _imageSize.width,
+              zone.top * _imageSize.height,
+              zone.right * _imageSize.width,
+              zone.bottom * _imageSize.height,
+            );
+            if (scaledZone.contains(Offset(newX + 50, newY+50))) {
+              isBlocked = true;
+              break;
+            }
+          }
+
+            if (!isBlocked) {
+              characterList[i].x = newX;
+              characterList[i].y = newY;
+            } else {
+              // 충돌 시 반대 방향으로 이동
+              _velocities[i] = Offset(-_velocities[i].dx, -_velocities[i].dy);
+            }
+
             // x축 경계 체크 및 반대 방향 전환
             if (characterList[i].x < 0) {
               characterList[i].x = 0;
-              _velocities[i] = Offset(_velocities[i].dx.abs(), _velocities[i].dy);
+              _velocities[i] =
+                  Offset(_velocities[i].dx.abs(), _velocities[i].dy);
             } else if (characterList[i].x > maxX) {
               characterList[i].x = maxX;
-              _velocities[i] = Offset(-_velocities[i].dx.abs(), _velocities[i].dy);
+              _velocities[i] =
+                  Offset(-_velocities[i].dx.abs(), _velocities[i].dy);
             }
             // y축 경계 체크 및 반대 방향 전환
             if (characterList[i].y < 0) {
               characterList[i].y = 0;
-              _velocities[i] = Offset(_velocities[i].dx, _velocities[i].dy.abs());
+              _velocities[i] =
+                  Offset(_velocities[i].dx, _velocities[i].dy.abs());
             } else if (characterList[i].y > maxY) {
               characterList[i].y = maxY;
-              _velocities[i] = Offset(_velocities[i].dx, -_velocities[i].dy.abs());
+              _velocities[i] =
+                  Offset(_velocities[i].dx, -_velocities[i].dy.abs());
             }
           }
         });
@@ -172,7 +229,7 @@ class _GameScreenState extends State<GameScreen> {
     });
 
     // 10초마다 각 캐릭터의 방향을 랜덤하게 변경
-    _directionTimer = Timer.periodic(Duration(seconds: 10), (timer) {
+    _directionTimer = Timer.periodic(Duration(seconds: 4), (timer) {
       if (characterList.isNotEmpty && _velocities.isNotEmpty) {
         setState(() {
           int count = min(characterList.length, _velocities.length);
@@ -184,11 +241,11 @@ class _GameScreenState extends State<GameScreen> {
     });
 
     // 1초마다 이동을 정지/재개 (1초 정지, 1초 이동 반복)
-    _pauseTimer = Timer.periodic(Duration(seconds: 1), (timer) {
-      setState(() {
-        _isPaused = !_isPaused;
-      });
-    });
+    // _pauseTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+    //   setState(() {
+    //     _isPaused = !_isPaused;
+    //   });
+    // });
   }
 
   @override
@@ -201,12 +258,21 @@ class _GameScreenState extends State<GameScreen> {
     super.dispose();
   }
 
-  // @override
-  // void didChangeDependencies() {
-  //   super.didChangeDependencies();
-  //   final screenSize = MediaQuery.of(context).size;
-  //   _getCharacters(screenSize);
-  // }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final renderBox =
+          _imageKey.currentContext?.findRenderObject() as RenderBox?;
+      if (renderBox != null) {
+        setState(() {
+          _imageSize = renderBox.size;
+          _relativePosition = Offset(0.4, 0.5); // 예시로 이미지의 중앙을 설정
+          // print(blockedZones);
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -215,23 +281,49 @@ class _GameScreenState extends State<GameScreen> {
         children: [
           // 배경 이미지
           Positioned.fill(
-            child: Image.asset("assets/images/backgroundv2.png", fit: BoxFit.cover),
+            child:
+                Image.asset("assets/images/backgroundv2.png", fit: BoxFit.fill),
+            key: _imageKey,
           ),
-          // Positioned.fill(
-          //   child: Transform(
-          //     // transform으로 위치 조정 (예: x축으로 50 이동, y축으로 20 이동)
-          //     // transform: Matrix4.translationValues(50.0, 20.0, 0.0),
-
-          //     child: Image.asset(
-          //       "assets/images/backgroundv2.png",
-          //       fit: BoxFit.cover, // 이미지가 화면을 꽉 채우도록
-          //     ),
-          //   ),
-          // ),
+          CustomPaint(
+            size: Size.infinite,
+            painter: GamePainter(blockedZones, _relativePosition, _imageSize),
+          ),
           // 캐릭터 리스트 (위에서 업데이트되는 characterList를 그대로 사용)
           CharacterListView(characters: characterList)
         ],
       ),
     );
+  }
+}
+
+class GamePainter extends CustomPainter {
+  final List<Rect> blockedZones;
+  final Offset relativePosition;
+  final Size imageSize;
+
+  GamePainter(this.blockedZones, this.relativePosition, this.imageSize);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    Paint paint = Paint()
+      ..color = Colors.red.withOpacity(0.5)
+      ..style = PaintingStyle.fill;
+
+    // 불가능한 영역을 그리기
+    for (var zone in blockedZones) {
+      final relativeZone = Rect.fromLTRB(
+        zone.left * size.width,
+        zone.top * size.height,
+        zone.right * size.width,
+        zone.bottom * size.height,
+      );
+      canvas.drawRect(relativeZone, paint); // 각 불가능한 영역을 빨간색으로 그리기
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return true;
   }
 }

@@ -36,14 +36,14 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
     if (token == null || token.isEmpty) {
       // ✅ 토큰이 없으면 로그인 화면으로 이동
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => LoginScreen()),
-      );
-      return;
+      // Navigator.pushReplacement(
+      //   context,
+      //   MaterialPageRoute(builder: (context) => LoginScreen()),
+      // );
+      // return;
     }
 
-    await _fetchFriends(token); // ✅ 토큰이 있으면 친구 목록 불러오기
+    // await _fetchFriends(token); // ✅ 토큰이 있으면 친구 목록 불러오기
   }
 
   Future<void> _fetchFriends(String token) async {
