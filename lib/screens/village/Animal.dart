@@ -38,15 +38,11 @@ factory Animal.fromJson(Map<String, dynamic> json, {Size? screenSize, double con
     final Random random = Random();
     final double maxX = screenSize.width - containerSize;
     final double maxY = screenSize.height - containerSize;
-    x = 150;
-    y = 400;
-    // x = random.nextDouble() * maxX;
-    // y = random.nextDouble() * maxY;
+    x = random.nextDouble() * maxX;
+    y = random.nextDouble() * maxY;
   } else {
-    // x = json['position_x']?.toDouble() ?? 50.0;
-    // y = json['position_y']?.toDouble() ?? 100.0;
-    x = 150;
-    y = 400;
+    x = json['position_x']?.toDouble() ?? 50.0;
+    y = json['position_y']?.toDouble() ?? 100.0;
   }
   return Animal(
     x: x,
