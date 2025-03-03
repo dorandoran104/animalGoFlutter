@@ -1,7 +1,7 @@
 import 'dart:convert';
-
 import 'package:animalgo/screens/village/Animal.dart';
 import 'package:animalgo/screens/village/CharacterListView.dart';
+import '../chat/ChatRoomScreen.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -11,6 +11,7 @@ import 'dart:math';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_joystick/flutter_joystick.dart';
 
 class GameScreen extends StatefulWidget {
   @override
@@ -23,6 +24,17 @@ class _GameScreenState extends State<GameScreen> {
   StreamSubscription? _subscription;
   Set<String> _activeCollisions = {};
   bool _isWebSocketConnected = false;
+
+  Animal? playerCharacter;
+  bool _isPlayerVisible = true;
+  List<String> _logs = [];
+  bool _isColliding = false;
+  bool _isCollidingWithPlayer = false;
+  String? _lastCollidedAnimalId;
+  String? _lastCollidedAnimalName;
+  bool _isClearingCollisions = false;
+  bool _disablePlayerCollision = false;
+
   List<Rect> blockedZones = [
     Rect.fromLTWH(0.51, 0.0001, 0.037, 0.6333), //가운대 선
     Rect.fromLTWH(0.00001, 0.000001, 0.99999, 0.333), // 위
@@ -41,7 +53,6 @@ class _GameScreenState extends State<GameScreen> {
   late List<Offset> _velocities;
   bool _isPaused = false;
 
-  // 4방향 (오른쪽, 왼쪽, 아래, 위)
   final List<Offset> _directions = const [
     Offset(1, 0),
     Offset(-1, 0),
@@ -49,27 +60,38 @@ class _GameScreenState extends State<GameScreen> {
     Offset(0, -1),
   ];
 
+  void _addLog(String message) {
+    setState(() {
+      _logs.insert(0, message);
+      if (_logs.length > 10) _logs.removeLast();
+      print('Log added: $message');
+    });
+  }
+
   void _connectWebSocket() {
     if (_isWebSocketConnected) return;
 
     var wsUrl = dotenv.env['WS_URL'] ?? 'ws://122.46.89.124:7000/ws';
     wsUrl += '/1';
     print(wsUrl);
+    _addLog('Connecting to WebSocket: $wsUrl');
     if (kIsWeb) {
       channel = WebSocketChannel.connect(Uri.parse(wsUrl));
     } else {
       channel = IOWebSocketChannel.connect(wsUrl);
     }
     _subscription = channel.stream.listen(
-      (message) {
+          (message) {
         print('Received message: $message');
-        // TODO: 메시지 처리 로직 추가
+        _addLog('WS Received: $message');
       },
       onError: (error) {
         print('WebSocket error: $error');
+        _addLog('WS Error: $error');
       },
       onDone: () {
         print('WebSocket connection closed');
+        _addLog('WS Closed');
         _isWebSocketConnected = false;
       },
     );
@@ -79,13 +101,16 @@ class _GameScreenState extends State<GameScreen> {
   Future<void> _getCharacters() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('cookie') ?? 1;
+    final userId = prefs.getString('user_id') ?? 'default_user';
+    
     try {
       Dio dio = Dio(
         BaseOptions(
-          baseUrl: "http://127.0.0.1:8000",
+          baseUrl: "http://122.46.89.124:7000",
           headers: {'Content-Type': 'application/json'},
         ),
       );
+      _addLog('Fetching characters...');
       var response = await dio.get("/village/get_characters/${token}");
       if (response.statusCode == 200 && response.data["result"]) {
         Map<String, dynamic> responseMap =
@@ -99,18 +124,102 @@ class _GameScreenState extends State<GameScreen> {
             print("Created animal: ${animal.nickname}");
             return animal;
           }).toList();
-          // 초기 _velocities 설정 – 캐릭터 수와 동일하게 할당
-          _velocities = characterList.map((_) {
-            return _directions[_random.nextInt(_directions.length)];
-          }).toList();
+
+          final playerIndex = characterList.indexWhere((animal) => animal.userId == userId);
+          if (playerIndex != -1) {
+            characterList[playerIndex].isPlayer = true;
+            playerCharacter = characterList[playerIndex];
+            _addLog('Player set: ${playerCharacter!.nickname}');
+          } else {
+            playerCharacter = Animal(
+              x: MediaQuery.of(context).size.width / 2,
+              y: MediaQuery.of(context).size.height / 2,
+              characterPath: 'assets/images/char1.png',
+              originalPath: '',
+              animalType: 'default',
+              appearance: 'default',
+              nickname: 'Player',
+              personality: 'neutral',
+              status: 'idle',
+              userId: userId,
+              character_id: 'player_default',
+              isPlayer: true,
+            );
+            characterList.add(playerCharacter!);
+            _addLog('Added default player: ${playerCharacter!.nickname}');
+          }
+
+          print('Character list length: ${characterList.length}');
+          print('Player character: ${playerCharacter?.nickname}, isPlayer: ${playerCharacter?.isPlayer}');
+          _velocities = List.generate(characterList.length, (_) => Offset.zero);
         });
       }
     } on DioException catch (e) {
       setState(() {
-        print(e);
+        print('Error fetching characters: $e');
+        _addLog('Error fetching characters: $e');
         characterList = [];
+        playerCharacter = null;
+        _velocities = [];
       });
     }
+  }
+
+  Future<void> _updateAffinity(String characterId, String action) async {
+    try {
+      Dio dio = Dio(
+        BaseOptions(
+          baseUrl: "http://122.46.89.124:7000",
+          headers: {'Content-Type': 'application/json'},
+        ),
+      );
+      // 친밀도 변경 API 호출
+      var response = await dio.post("/village/action/$characterId/$action");
+      if (response.statusCode == 200) {
+        _addLog('$action 성공: ${response.data.toString()}');
+        // 친밀도 조회 API 호출
+        var affinityResponse = await dio.get("/village/get_affinity/$characterId");
+        if (affinityResponse.statusCode == 200) {
+          _addLog('현재 친밀도: ${affinityResponse.data.toString()}');
+        } else {
+          _addLog('친밀도 조회 실패: ${affinityResponse.statusCode}');
+        }
+      } else {
+        _addLog('$action 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      _addLog('$action 오류: $e');
+    }
+  }
+
+  void _clearPlayerCollisions() {
+    setState(() {
+      _isClearingCollisions = true;
+      _disablePlayerCollision = true;
+      _activeCollisions.removeWhere((pair) {
+        return characterList.any((animal) => animal.isPlayer && pair.contains(animal.nickname));
+      });
+      _isCollidingWithPlayer = false;
+      _isColliding = false;
+      _lastCollidedAnimalId = null;
+      _lastCollidedAnimalName = null;
+
+      // 모든 동물 속도 재설정
+      for (var i = 0; i < characterList.length; i++) {
+        if (!characterList[i].isPlayer && !_activeCollisions.any((pair) => pair.contains(characterList[i].nickname))) {
+          _velocities[i] = _directions[_random.nextInt(_directions.length)];
+        }
+      }
+      _addLog('플레이어와의 충돌 해제, 동물 움직임 복구');
+
+      // 3초 후 플레이어 충돌 감지 재활성화
+      Timer(Duration(seconds: 3), () {
+        setState(() {
+          _disablePlayerCollision = false;
+          _addLog('플레이어 충돌 감지 재활성화');
+        });
+      });
+    });
   }
 
   @override
@@ -183,16 +292,17 @@ class _GameScreenState extends State<GameScreen> {
             bool isBlocked = false;
             
             for (var zone in blockedZones) {
-            final scaledZone = Rect.fromLTRB(
-              zone.left * _imageSize.width,
-              zone.top * _imageSize.height,
-              zone.right * _imageSize.width,
-              zone.bottom * _imageSize.height,
-            );
-            if (scaledZone.contains(Offset(newX + 50, newY+50))) {
-              isBlocked = true;
-              break;
-            }
+              if (characterList[i].isPlayer && !_isPlayerVisible) continue;
+              final scaledZone = Rect.fromLTRB(
+                zone.left * _imageSize.width,
+                zone.top * _imageSize.height,
+                zone.right * _imageSize.width,
+                zone.bottom * _imageSize.height,
+              );
+              if (scaledZone.contains(Offset(newX + 50, newY+50))) {
+                isBlocked = true;
+                break;
+              }
           }
 
             if (!isBlocked) {
@@ -213,7 +323,6 @@ class _GameScreenState extends State<GameScreen> {
               _velocities[i] =
                   Offset(-_velocities[i].dx.abs(), _velocities[i].dy);
             }
-            // y축 경계 체크 및 반대 방향 전환
             if (characterList[i].y < 0) {
               characterList[i].y = 0;
               _velocities[i] =
@@ -224,28 +333,103 @@ class _GameScreenState extends State<GameScreen> {
                   Offset(_velocities[i].dx, -_velocities[i].dy.abs());
             }
           }
+
+          // 충돌 감지 및 상태 업데이트
+          bool isCollidingWithPlayer = false;
+          if (!_isClearingCollisions && !_disablePlayerCollision) {
+            for (var i = 0; i < count; i++) {
+              final animalI = characterList[i];
+              for (var j = i + 1; j < count; j++) {
+                final animalJ = characterList[j];
+                if (animalI.isPlayer && !_isPlayerVisible) continue;
+                if (animalJ.isPlayer && !_isPlayerVisible) continue;
+
+                String pairKey = (animalI.nickname.compareTo(animalJ.nickname) < 0)
+                    ? "${animalI.nickname}_${animalJ.nickname}"
+                    : "${animalJ.nickname}_${animalI.nickname}";
+                if ((animalI.x - animalJ.x).abs() < 50 && (animalI.y - animalJ.y).abs() < 50) {
+                  if (!_activeCollisions.contains(pairKey)) {
+                    _activeCollisions.add(pairKey);
+                    final collisionData = {
+                      'event': 'collision',
+                      'pairKey': pairKey,
+                      'characters': [
+                        {'id': animalI.character_id, 'nickname': animalI.nickname, 'x': animalI.x, 'y': animalI.y, 'animaltype': animalI.animalType, 'personality': animalI.personality},
+                        {'id': animalJ.character_id, 'nickname': animalJ.nickname, 'x': animalJ.x, 'y': animalJ.y, 'animaltype': animalJ.animalType, 'personality': animalJ.personality},
+                      ],
+                    };
+                    channel.sink.add(jsonEncode(collisionData));
+                    _addLog('${animalI.nickname}과 ${animalJ.nickname}이(가) 충돌했습니다.');
+                    if (animalI.isPlayer || animalJ.isPlayer) {
+                      isCollidingWithPlayer = true;
+                      if (animalI.isPlayer) {
+                        _lastCollidedAnimalId = animalJ.character_id;
+                        _lastCollidedAnimalName = animalJ.nickname;
+                      } else {
+                        _lastCollidedAnimalId = animalI.character_id;
+                        _lastCollidedAnimalName = animalI.nickname;
+                      }
+                    }
+                  }
+                  if (!isCollidingWithPlayer) {
+                    _velocities[i] = Offset.zero;
+                    _velocities[j] = Offset.zero;
+                  }
+                } else {
+                  if (_activeCollisions.contains(pairKey)) {
+                    _activeCollisions.remove(pairKey);
+                  }
+                }
+              }
+            }
+
+            _isColliding = isCollidingWithPlayer || _activeCollisions.any((pair) {
+              return characterList.any((animal) => animal.isPlayer && (pair.contains(animal.nickname)));
+            });
+
+            _isCollidingWithPlayer = isCollidingWithPlayer || _activeCollisions.any((pair) {
+              return characterList.any((animal) => animal.isPlayer && (pair.contains(animal.nickname)));
+            });
+          }
+
+          for (var i = 0; i < count; i++) {
+            if (_isCollidingWithPlayer) {
+              _velocities[i] = Offset.zero;
+            } else if (_activeCollisions.any((pair) => pair.contains(characterList[i].nickname))) {
+              _velocities[i] = Offset.zero;
+            } else if (!characterList[i].isPlayer && _velocities[i] == Offset.zero) {
+              _velocities[i] = _directions[_random.nextInt(_directions.length)];
+            }
+          }
+
+          _isClearingCollisions = false;
         });
       }
     });
 
     // 10초마다 각 캐릭터의 방향을 랜덤하게 변경
-    _directionTimer = Timer.periodic(Duration(seconds: 4), (timer) {
+    _directionTimer = Timer.periodic(Duration(seconds: 10), (timer) {
       if (characterList.isNotEmpty && _velocities.isNotEmpty) {
         setState(() {
           int count = min(characterList.length, _velocities.length);
           for (var i = 0; i < count; i++) {
-            _velocities[i] = _directions[_random.nextInt(_directions.length)];
+            if (_isCollidingWithPlayer) {
+              _velocities[i] = Offset.zero;
+            } else if (!characterList[i].isPlayer && !_activeCollisions.any((pair) => pair.contains(characterList[i].nickname))) {
+              _velocities[i] = _directions[_random.nextInt(_directions.length)];
+            }
           }
         });
       }
     });
 
     // 1초마다 이동을 정지/재개 (1초 정지, 1초 이동 반복)
-    // _pauseTimer = Timer.periodic(Duration(seconds: 1), (timer) {
-    //   setState(() {
-    //     _isPaused = !_isPaused;
-    //   });
-    // });
+    _pauseTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      setState(() {
+        _isPaused = !_isPaused;
+    _addLog('Pause toggled: $_isPaused');
+      });
+    });
   }
 
   @override
@@ -274,25 +458,182 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
+void _updatePosition(StickDragDetails details) {
+    setState(() {
+      if (playerCharacter != null && _isPlayerVisible) {
+        final speed = 2.0;
+        playerCharacter!.x += details.x * speed;
+        playerCharacter!.y += details.y * speed;
+        _addLog('Player moved to (${playerCharacter!.x.toInt()}, ${playerCharacter!.y.toInt()})');
+      }
+    });
+  }
+
+  void _togglePlayerVisibility() {
+    setState(() {
+      _isPlayerVisible = !_isPlayerVisible;
+      _addLog('Player visibility: $_isPlayerVisible');
+    });
+  }
+
+  void _startChat() async {
+    if (_isCollidingWithPlayer && _lastCollidedAnimalId != null && _lastCollidedAnimalName != null) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatRoomScreen(
+            chatId: _lastCollidedAnimalId!,
+            friendName: _lastCollidedAnimalName!,
+          ),
+        ),
+      );
+      _clearPlayerCollisions();
+    } else {
+      _addLog('채팅할 동물이 없습니다. 동물과 충돌하세요!');
+    }
+  }
+
+  void _feedAnimal() async {
+    if (_isCollidingWithPlayer && _lastCollidedAnimalId != null && _lastCollidedAnimalName != null) {
+      await _updateAffinity(_lastCollidedAnimalId!, 'feeding');
+      _clearPlayerCollisions();
+    } else {
+      _addLog('먹이를 줄 동물이 없습니다. 동물과 충돌하세요!');
+    }
+  }
+
+  void _ignoreAnimal() async {
+    if (_isCollidingWithPlayer && _lastCollidedAnimalId != null && _lastCollidedAnimalName != null) {
+      await _updateAffinity(_lastCollidedAnimalId!, 'ignore');
+      _clearPlayerCollisions();
+    } else {
+      _addLog('무시할 동물이 없습니다. 동물과 충돌하세요!');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final displayList = _isPlayerVisible
+        ? characterList
+        : characterList.where((character) => !character.isPlayer).toList();
+
     return Scaffold(
-      body: Stack(
-        children: [
-          // 배경 이미지
-          Positioned.fill(
-            child:
-                Image.asset("assets/images/backgroundv2.png", fit: BoxFit.fill),
-            key: _imageKey,
-          ),
-          CustomPaint(
-            size: Size.infinite,
-            painter: GamePainter(blockedZones, _relativePosition, _imageSize),
-          ),
-          // 캐릭터 리스트 (위에서 업데이트되는 characterList를 그대로 사용)
-          CharacterListView(characters: characterList)
-        ],
-      ),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Image.asset("assets/images/backgroundv2.png", fit: BoxFit.cover),
+            ),
+            CharacterListView(
+              characters: displayList,
+            ),
+            Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 16.0),
+                child: Container(
+                  width: 300,
+                  height: 100,
+                  color: Colors.black.withOpacity(0.7),
+                  child: _logs.isEmpty
+                      ? const Center(
+                    child: Text(
+                      'No logs available',
+                      style: TextStyle(
+                        fontFamily: 'PressStart2P',
+                        fontSize: 10,
+                        color: Colors.white,
+                      ),
+                    ),
+                  )
+                      : ListView.builder(
+                    reverse: true,
+                    itemCount: _logs.length,
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 4.0),
+                        child: Text(
+                          _logs[index],
+                          style: const TextStyle(
+                            fontFamily: 'PressStart2P',
+                            fontSize: 10,
+                            color: Colors.white,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton(
+                      onPressed: _togglePlayerVisibility,
+                      child: Text(_isPlayerVisible ? '숨기기' : '보이기'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: 80,
+                      height: 80,
+                      child: Joystick(
+                        mode: JoystickMode.all,
+                        listener: (details) => _updatePosition(details),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: AnimatedOpacity(
+                  opacity: _isColliding ? 1.0 : 0.5,
+                  duration: const Duration(milliseconds: 300),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ElevatedButton(
+                        onPressed: _startChat,
+                        child: const Text('채팅하기'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton(
+                        onPressed: _feedAnimal,
+                        child: const Text('먹이주기'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton(
+                        onPressed: _ignoreAnimal,
+                        child: const Text('무시하기'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      )
     );
   }
 }
