@@ -33,16 +33,21 @@ class Animal {
 
 factory Animal.fromJson(Map<String, dynamic> json, {Size? screenSize, double containerSize = 40.0}) {
   double x, y;
+  final Random random = Random();
   if (screenSize != null) {
     // 화면 내에 캐릭터가 들어갈 수 있는 최대값을 구함.
-    final Random random = Random();
     final double maxX = screenSize.width - containerSize;
     final double maxY = screenSize.height - containerSize;
     x = random.nextDouble() * maxX;
-    y = random.nextDouble() * maxY;
+    // y = random.nextDouble() * maxY;
+    y = 250 + random.nextDouble() * (550 - 250);
+    // x = 150;
+    // y = 400;
   } else {
     x = json['position_x']?.toDouble() ?? 50.0;
-    y = json['position_y']?.toDouble() ?? 100.0;
+    y = json['position_y']?.toDouble() ?? 250 + random.nextDouble() * (550 - 250);
+    // x = 150;
+    // y = 400;
   }
   return Animal(
     x: x,

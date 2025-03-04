@@ -108,6 +108,7 @@ class _GameScreenState extends State<GameScreen> {
       Dio dio = Dio(
         BaseOptions(
           baseUrl: "http://122.46.89.124:7000",
+          // baseUrl: "http://127.0.0.1:8000",
           headers: {'Content-Type': 'application/json'},
         ),
       );
@@ -234,25 +235,85 @@ class _GameScreenState extends State<GameScreen> {
     super.initState();
     _getCharacters();
     _connectWebSocket();
-    startMove();
-  }
 
-  void startMove() {
-    //   // 60fps: 약 16ms마다 위치 업데이트 (화면 사이즈는 캐릭터 컨테이너 50x50 기준)
-      _movementTimer = Timer.periodic(Duration(milliseconds: 16), (timer) {
-        if (!_isPaused && characterList.isNotEmpty && _velocities.isNotEmpty) {
-          setState(() {
-            int count = min(characterList.length, _velocities.length);
-            // 캐릭터끼리 충돌 체크 (간단히 50x50 박스 기준)
+    //// 60fps: 약 16ms마다 위치 업데이트 (화면 사이즈는 캐릭터 컨테이너 50x50 기준)
+    _movementTimer = Timer.periodic(Duration(milliseconds: 16), (timer) {
+      if (!_isPaused && characterList.isNotEmpty && _velocities.isNotEmpty) {
+        setState(() {
+          int count = min(characterList.length, _velocities.length);
+          // 캐릭터끼리 충돌 체크 (간단히 50x50 박스 기준)
+
+          final screenSize = MediaQuery.of(context).size;
+          final maxX = screenSize.width - 50;
+          final maxY = screenSize.height - 50;
+          for (var i = 0; i < count; i++) {
+            final newX = characterList[i].x + _velocities[i].dx;
+            final newY = characterList[i].y + _velocities[i].dy;
+
+            // 블록된 영역과의 충돌 체크
+            bool isBlocked = false;
+
+            for (var zone in blockedZones) {
+              // if (characterList[i].isPlayer && !_isPlayerVisible) continue;
+              final scaledZone = Rect.fromLTRB(
+                zone.left * _imageSize.width,
+                zone.top * _imageSize.height,
+                zone.right * _imageSize.width,
+                zone.bottom * _imageSize.height,
+              );
+              // print('Checking zone: $scaledZone with position: (${newX + 50}, ${newY + 50})');
+
+              if (scaledZone.contains(Offset(newX, newY))) {
+                isBlocked = true;
+                // print('Collision detected with zone: $scaledZone');
+                break;
+              }
+            }
+            if (!isBlocked) {
+              characterList[i].x = newX;
+              characterList[i].y = newY;
+            } else {
+              // 충돌 시 반대 방향으로 이동
+              _velocities[i] = Offset(-_velocities[i].dx, -_velocities[i].dy);
+            }
+
+            // x축 경계 체크 및 반대 방향 전환
+            if (characterList[i].x < 0) {
+              characterList[i].x = 0;
+              _velocities[i] =
+                  Offset(_velocities[i].dx.abs(), _velocities[i].dy);
+            } else if (characterList[i].x > maxX) {
+              characterList[i].x = maxX;
+              _velocities[i] =
+                  Offset(-_velocities[i].dx.abs(), _velocities[i].dy);
+            }
+            if (characterList[i].y < 0) {
+              characterList[i].y = 0;
+              _velocities[i] =
+                  Offset(_velocities[i].dx, _velocities[i].dy.abs());
+            } else if (characterList[i].y > maxY) {
+              characterList[i].y = maxY;
+              _velocities[i] =
+                  Offset(_velocities[i].dx, -_velocities[i].dy.abs());
+            }
+          }
+
+          // 충돌 감지 및 상태 업데이트
+          bool isCollidingWithPlayer = false;
+          if (!_isClearingCollisions && !_disablePlayerCollision) {
             for (var i = 0; i < count; i++) {
+              final animalI = characterList[i];
               for (var j = i + 1; j < count; j++) {
-                final a = characterList[i];
-                final b = characterList[j];
-                String pairKey = (a.nickname.compareTo(b.nickname) < 0)
-                    ? "${a.nickname}_${b.nickname}"
-                    : "${b.nickname}_${a.nickname}";
-                if ((a.x - b.x).abs() < 50 && (a.y - b.y).abs() < 50) {
-                  // 이미 충돌 메시지가 전송되지 않은 경우에만 전송
+                final animalJ = characterList[j];
+                if (animalI.isPlayer && !_isPlayerVisible) continue;
+                if (animalJ.isPlayer && !_isPlayerVisible) continue;
+
+                String pairKey =
+                    (animalI.nickname.compareTo(animalJ.nickname) < 0)
+                        ? "${animalI.nickname}_${animalJ.nickname}"
+                        : "${animalJ.nickname}_${animalI.nickname}";
+                if ((animalI.x - animalJ.x).abs() < 50 &&
+                    (animalI.y - animalJ.y).abs() < 50) {
                   if (!_activeCollisions.contains(pairKey)) {
                     _activeCollisions.add(pairKey);
                     final collisionData = {
@@ -260,210 +321,104 @@ class _GameScreenState extends State<GameScreen> {
                       'pairKey': pairKey,
                       'characters': [
                         {
-                          'id': a.character_id,
-                          'nickname': a.nickname,
-                          'x': a.x,
-                          'y': a.y,
-                          'animaltype': a.animalType,
-                          'personality': a.personality
+                          'id': animalI.character_id,
+                          'nickname': animalI.nickname,
+                          'x': animalI.x,
+                          'y': animalI.y,
+                          'animaltype': animalI.animalType,
+                          'personality': animalI.personality
                         },
                         {
-                          'id': b.character_id,
-                          'nickname': b.nickname,
-                          'x': b.x,
-                          'y': b.y,
-                          'animaltype': b.animalType,
-                          'personality': b.personality
+                          'id': animalJ.character_id,
+                          'nickname': animalJ.nickname,
+                          'x': animalJ.x,
+                          'y': animalJ.y,
+                          'animaltype': animalJ.animalType,
+                          'personality': animalJ.personality
                         },
                       ],
                     };
                     channel.sink.add(jsonEncode(collisionData));
-                    // print("Collision detected between ${a.nickname} and ${b.nickname}");
-                  }
-                  // // 충돌 시 해당 캐릭터들의 이동 정지
-                  // _velocities[i] = Offset.zero;
-                  // _velocities[j] = Offset.zero;
-                }
-              }
-            }
-
-            final screenSize = MediaQuery.of(context).size;
-            final maxX = screenSize.width - 50;
-            final maxY = screenSize.height - 50;
-            for (var i = 0; i < count; i++) {
-              final newX = characterList[i].x + _velocities[i].dx;
-              final newY = characterList[i].y + _velocities[i].dy;
-
-              // 블록된 영역과의 충돌 체크
-              bool isBlocked = false;
-
-              for (var zone in blockedZones) {
-                if (characterList[i].isPlayer && !_isPlayerVisible) continue;
-                final scaledZone = Rect.fromLTRB(
-                  zone.left * _imageSize.width,
-                  zone.top * _imageSize.height,
-                  zone.right * _imageSize.width,
-                  zone.bottom * _imageSize.height,
-                );
-                if (scaledZone.contains(Offset(newX + 50, newY + 50))) {
-                  isBlocked = true;
-                  break;
-                }
-              }
-
-              if (!isBlocked) {
-                characterList[i].x = newX;
-                characterList[i].y = newY;
-              } else {
-                // 충돌 시 반대 방향으로 이동
-                _velocities[i] = Offset(-_velocities[i].dx, -_velocities[i].dy);
-              }
-
-              // x축 경계 체크 및 반대 방향 전환
-              if (characterList[i].x < 0) {
-                characterList[i].x = 0;
-                _velocities[i] =
-                    Offset(_velocities[i].dx.abs(), _velocities[i].dy);
-              } else if (characterList[i].x > maxX) {
-                characterList[i].x = maxX;
-                _velocities[i] =
-                    Offset(-_velocities[i].dx.abs(), _velocities[i].dy);
-              }
-              if (characterList[i].y < 0) {
-                characterList[i].y = 0;
-                _velocities[i] =
-                    Offset(_velocities[i].dx, _velocities[i].dy.abs());
-              } else if (characterList[i].y > maxY) {
-                characterList[i].y = maxY;
-                _velocities[i] =
-                    Offset(_velocities[i].dx, -_velocities[i].dy.abs());
-              }
-            }
-
-            // 충돌 감지 및 상태 업데이트
-            bool isCollidingWithPlayer = false;
-            if (!_isClearingCollisions && !_disablePlayerCollision) {
-              for (var i = 0; i < count; i++) {
-                final animalI = characterList[i];
-                for (var j = i + 1; j < count; j++) {
-                  final animalJ = characterList[j];
-                  if (animalI.isPlayer && !_isPlayerVisible) continue;
-                  if (animalJ.isPlayer && !_isPlayerVisible) continue;
-
-                  String pairKey =
-                      (animalI.nickname.compareTo(animalJ.nickname) < 0)
-                          ? "${animalI.nickname}_${animalJ.nickname}"
-                          : "${animalJ.nickname}_${animalI.nickname}";
-                  if ((animalI.x - animalJ.x).abs() < 50 &&
-                      (animalI.y - animalJ.y).abs() < 50) {
-                    if (!_activeCollisions.contains(pairKey)) {
-                      _activeCollisions.add(pairKey);
-                      final collisionData = {
-                        'event': 'collision',
-                        'pairKey': pairKey,
-                        'characters': [
-                          {
-                            'id': animalI.character_id,
-                            'nickname': animalI.nickname,
-                            'x': animalI.x,
-                            'y': animalI.y,
-                            'animaltype': animalI.animalType,
-                            'personality': animalI.personality
-                          },
-                          {
-                            'id': animalJ.character_id,
-                            'nickname': animalJ.nickname,
-                            'x': animalJ.x,
-                            'y': animalJ.y,
-                            'animaltype': animalJ.animalType,
-                            'personality': animalJ.personality
-                          },
-                        ],
-                      };
-                      channel.sink.add(jsonEncode(collisionData));
-                      _addLog(
-                          '${animalI.nickname}과 ${animalJ.nickname}이(가) 충돌했습니다.');
-                      if (animalI.isPlayer || animalJ.isPlayer) {
-                        isCollidingWithPlayer = true;
-                        if (animalI.isPlayer) {
-                          _lastCollidedAnimalId = animalJ.character_id;
-                          _lastCollidedAnimalName = animalJ.nickname;
-                        } else {
-                          _lastCollidedAnimalId = animalI.character_id;
-                          _lastCollidedAnimalName = animalI.nickname;
-                        }
+                    _addLog(
+                        '${animalI.nickname}과 ${animalJ.nickname}이(가) 충돌했습니다.');
+                    if (animalI.isPlayer || animalJ.isPlayer) {
+                      isCollidingWithPlayer = true;
+                      if (animalI.isPlayer) {
+                        _lastCollidedAnimalId = animalJ.character_id;
+                        _lastCollidedAnimalName = animalJ.nickname;
+                      } else {
+                        _lastCollidedAnimalId = animalI.character_id;
+                        _lastCollidedAnimalName = animalI.nickname;
                       }
                     }
-                    if (!isCollidingWithPlayer) {
-                      _velocities[i] = Offset.zero;
-                      _velocities[j] = Offset.zero;
-                    }
-                  } else {
-                    if (_activeCollisions.contains(pairKey)) {
-                      _activeCollisions.remove(pairKey);
-                    }
+                  }
+                  if (!isCollidingWithPlayer) {
+                    _velocities[i] = Offset.zero;
+                    _velocities[j] = Offset.zero;
+                  }
+                } else {
+                  if (_activeCollisions.contains(pairKey)) {
+                    _activeCollisions.remove(pairKey);
                   }
                 }
               }
-
-              _isColliding = isCollidingWithPlayer ||
-                  _activeCollisions.any((pair) {
-                    return characterList.any((animal) =>
-                        animal.isPlayer && (pair.contains(animal.nickname)));
-                  });
-
-              _isCollidingWithPlayer = isCollidingWithPlayer ||
-                  _activeCollisions.any((pair) {
-                    return characterList.any((animal) =>
-                        animal.isPlayer && (pair.contains(animal.nickname)));
-                  });
             }
 
-            for (var i = 0; i < count; i++) {
-              if (_isCollidingWithPlayer) {
-                _velocities[i] = Offset.zero;
-              } else if (_activeCollisions
-                  .any((pair) => pair.contains(characterList[i].nickname))) {
-                _velocities[i] = Offset.zero;
-              } else if (!characterList[i].isPlayer &&
-                  _velocities[i] == Offset.zero) {
-                _velocities[i] =
-                    _directions[_random.nextInt(_directions.length)];
-              }
+            _isColliding = isCollidingWithPlayer ||
+                _activeCollisions.any((pair) {
+                  return characterList.any((animal) =>
+                      animal.isPlayer && (pair.contains(animal.nickname)));
+                });
+
+            _isCollidingWithPlayer = isCollidingWithPlayer ||
+                _activeCollisions.any((pair) {
+                  return characterList.any((animal) =>
+                      animal.isPlayer && (pair.contains(animal.nickname)));
+                });
+          }
+
+          for (var i = 0; i < count; i++) {
+            if (_isCollidingWithPlayer) {
+              _velocities[i] = Offset.zero;
+            } else if (_activeCollisions
+                .any((pair) => pair.contains(characterList[i].nickname))) {
+              _velocities[i] = Offset.zero;
+            } else if (!characterList[i].isPlayer &&
+                _velocities[i] == Offset.zero) {
+              _velocities[i] = _directions[_random.nextInt(_directions.length)];
             }
-
-            _isClearingCollisions = false;
-          });
-        }
-      });
-
-      // 10초마다 각 캐릭터의 방향을 랜덤하게 변경
-      _directionTimer = Timer.periodic(Duration(seconds: 10), (timer) {
-        if (characterList.isNotEmpty && _velocities.isNotEmpty) {
-          setState(() {
-            int count = min(characterList.length, _velocities.length);
-            for (var i = 0; i < count; i++) {
-              if (_isCollidingWithPlayer) {
-                _velocities[i] = Offset.zero;
-              } else if (!characterList[i].isPlayer &&
-                  !_activeCollisions.any(
-                      (pair) => pair.contains(characterList[i].nickname))) {
-                _velocities[i] =
-                    _directions[_random.nextInt(_directions.length)];
-              }
-            }
-          });
-        }
-      });
-
-      // 1초마다 이동을 정지/재개 (1초 정지, 1초 이동 반복)
-      _pauseTimer = Timer.periodic(Duration(seconds: 1), (timer) {
-        setState(() {
-          _isPaused = !_isPaused;
-          _addLog('Pause toggled: $_isPaused');
+          }
+          _isClearingCollisions = false;
         });
-      });
-    }
+      }
+    });
+
+    // 10초마다 각 캐릭터의 방향을 랜덤하게 변경
+    _directionTimer = Timer.periodic(Duration(seconds: 10), (timer) {
+      if (characterList.isNotEmpty && _velocities.isNotEmpty) {
+        setState(() {
+          int count = min(characterList.length, _velocities.length);
+          for (var i = 0; i < count; i++) {
+            if (_isCollidingWithPlayer) {
+              _velocities[i] = Offset.zero;
+            } else if (!characterList[i].isPlayer &&
+                !_activeCollisions
+                    .any((pair) => pair.contains(characterList[i].nickname))) {
+              _velocities[i] = _directions[_random.nextInt(_directions.length)];
+            }
+          }
+        });
+      }
+    });
+
+    // 1초마다 이동을 정지/재개 (1초 정지, 1초 이동 반복)
+    _pauseTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      // setState(() {
+      //   _isPaused = !_isPaused;
+      //   _addLog('Pause toggled: $_isPaused');
+      // });
+    });
+  }
 
   @override
   void dispose() {
@@ -479,8 +434,7 @@ class _GameScreenState extends State<GameScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final renderBox =
-          _imageKey.currentContext?.findRenderObject() as RenderBox?;
+      final renderBox =_imageKey.currentContext?.findRenderObject() as RenderBox?;
       if (renderBox != null) {
         setState(() {
           _imageSize = renderBox.size;
@@ -562,8 +516,9 @@ class _GameScreenState extends State<GameScreen> {
       child: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset("assets/images/backgroundv2.png",
-                fit: BoxFit.fill),
+            child:
+                Image.asset("assets/images/backgroundv2.png", fit: BoxFit.fill),
+                key: _imageKey,
           ),
           CharacterListView(
             characters: displayList,
@@ -679,8 +634,7 @@ class _GameScreenState extends State<GameScreen> {
           ),
         ],
       ),
-      )
-    );
+    ));
   }
 }
 
