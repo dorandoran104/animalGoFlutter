@@ -19,11 +19,11 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
-  late WebSocketChannel channel;
+  // late WebSocketChannel channel;
   List<Animal> characterList = [];
   StreamSubscription? _subscription;
   Set<String> _activeCollisions = {};
-  bool _isWebSocketConnected = false;
+  // bool _isWebSocketConnected = false;
 
   Animal? playerCharacter;
   bool _isPlayerVisible = true;
@@ -36,7 +36,7 @@ class _GameScreenState extends State<GameScreen> {
   bool _disablePlayerCollision = false;
 
   List<Rect> blockedZones = [
-    Rect.fromLTWH(0.51, 0.0001, 0.037, 0.6333), //가운대 선
+    Rect.fromLTWH(0.46666, 0.0001, 0.1111, 0.6333), //가운대 선
     Rect.fromLTWH(0.00001, 0.000001, 0.99999, 0.333), // 위
     Rect.fromLTWH(0.00001, 0.69999, 0.99999, 0.99999), // 아래
   ];
@@ -68,36 +68,36 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
-  void _connectWebSocket() {
-    if (_isWebSocketConnected) return;
+  // void _connectWebSocket() {
+  //   if (_isWebSocketConnected) return;
 
-    var wsUrl = dotenv.env['WS_URL'] ?? 'ws://122.46.89.124:7000/ws';
-    wsUrl += '/1';
-    print(wsUrl);
-    _addLog('Connecting to WebSocket: $wsUrl');
-    if (kIsWeb) {
-      channel = WebSocketChannel.connect(Uri.parse(wsUrl));
-    } else {
-      channel = IOWebSocketChannel.connect(wsUrl);
-    }
-    _subscription = channel.stream.listen(
-      (message) {
-        print('Received message: $message');
-        _addLog('WS Received: $message');
-      },
-      onError: (error) {
-        print('WebSocket error: $error');
-        _addLog('WS Error: $error');
-      },
-      onDone: () {
-        print('WebSocket connection closed');
-        _addLog('WS Closed');
-        _isWebSocketConnected = false;
-      },
-    );
+  //   var wsUrl = dotenv.env['WS_URL'] ?? 'ws://122.46.89.124:7000/ws';
+  //   wsUrl += '/1';
+  //   print(wsUrl);
+  //   _addLog('Connecting to WebSocket: $wsUrl');
+  //   if (kIsWeb) {
+  //     channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+  //   } else {
+  //     channel = IOWebSocketChannel.connect(wsUrl);
+  //   }
+  //   _subscription = channel.stream.listen(
+  //     (message) {
+  //       print('Received message: $message');
+  //       _addLog('WS Received: $message');
+  //     },
+  //     onError: (error) {
+  //       print('WebSocket error: $error');
+  //       _addLog('WS Error: $error');
+  //     },
+  //     onDone: () {
+  //       print('WebSocket connection closed');
+  //       _addLog('WS Closed');
+  //       _isWebSocketConnected = false;
+  //     },
+  //   );
 
-    _isWebSocketConnected = true;
-  }
+  //   _isWebSocketConnected = true;
+  // }
 
   Future<void> _getCharacters() async {
     final prefs = await SharedPreferences.getInstance();
@@ -210,6 +210,10 @@ class _GameScreenState extends State<GameScreen> {
       _lastCollidedAnimalId = null;
       _lastCollidedAnimalName = null;
 
+      Animal player = characterList.firstWhere((animal) => animal.isPlayer);
+
+      player.interaction = false;
+      player.disabledInteraction = false;
       // 모든 동물 속도 재설정
       for (var i = 0; i < characterList.length; i++) {
         if (!characterList[i].isPlayer &&
@@ -234,7 +238,7 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
     _getCharacters();
-    _connectWebSocket();
+    // _connectWebSocket();
 
     //// 60fps: 약 16ms마다 위치 업데이트 (화면 사이즈는 캐릭터 컨테이너 50x50 기준)
     _movementTimer = Timer.periodic(Duration(milliseconds: 16), (timer) {
@@ -308,13 +312,19 @@ class _GameScreenState extends State<GameScreen> {
                 if (animalI.isPlayer && !_isPlayerVisible) continue;
                 if (animalJ.isPlayer && !_isPlayerVisible) continue;
 
+                // 두 캐릭터의 닉네임을 사용하여 충돌 쌍의 키 생성
                 String pairKey =
                     (animalI.nickname.compareTo(animalJ.nickname) < 0)
                         ? "${animalI.nickname}_${animalJ.nickname}"
                         : "${animalJ.nickname}_${animalI.nickname}";
+
+                // 두 캐릭터가 충돌했는지 확인 (간단히 50x50 박스 기준)
                 if ((animalI.x - animalJ.x).abs() < 50 &&
                     (animalI.y - animalJ.y).abs() < 50) {
-                  if (!_activeCollisions.contains(pairKey)) {
+                  // 충돌 쌍이 아직 등록되지 않았고, 두 캐릭터가 상호작용 중이 아닌 경우
+                  if (!_activeCollisions.contains(pairKey) &&
+                      !animalI.interaction &&
+                      !animalJ.interaction) {
                     _activeCollisions.add(pairKey);
                     final collisionData = {
                       'event': 'collision',
@@ -338,9 +348,16 @@ class _GameScreenState extends State<GameScreen> {
                         },
                       ],
                     };
-                    channel.sink.add(jsonEncode(collisionData));
+                    // 상호작용시 다른 동물과 상호작용 안하게 설정
+                    animalJ.interaction = true;
+                    animalI.interaction = true;
+
+                    chatAnimal(collisionData);
+                    // channel.sink.add(jsonEncode(collisionData));
                     _addLog(
                         '${animalI.nickname}과 ${animalJ.nickname}이(가) 충돌했습니다.');
+
+                    // 플레이어와 충돌한 경우
                     if (animalI.isPlayer || animalJ.isPlayer) {
                       isCollidingWithPlayer = true;
                       if (animalI.isPlayer) {
@@ -352,18 +369,24 @@ class _GameScreenState extends State<GameScreen> {
                       }
                     }
                   }
-                  if (!isCollidingWithPlayer) {
+                  // 플레이어와 충돌하지 않은 경우, 두 캐릭터의 속도를 0으로 설정
+                  if (!isCollidingWithPlayer && animalJ.interaction || animalI.interaction) {
                     _velocities[i] = Offset.zero;
                     _velocities[j] = Offset.zero;
                   }
                 } else {
+                  // 충돌이 해제된 경우, 충돌 쌍을 제거
                   if (_activeCollisions.contains(pairKey)) {
+                    //상태값 변경
+                    animalJ.interaction = false;
+                    animalI.interaction = false;
                     _activeCollisions.remove(pairKey);
                   }
                 }
               }
             }
 
+            // 충돌 상태 업데이트
             _isColliding = isCollidingWithPlayer ||
                 _activeCollisions.any((pair) {
                   return characterList.any((animal) =>
@@ -377,12 +400,16 @@ class _GameScreenState extends State<GameScreen> {
                 });
           }
 
+          // 각 캐릭터의 속도 업데이트
           for (var i = 0; i < count; i++) {
+            // 플레이어와 충돌 중인 경우
             if (_isCollidingWithPlayer) {
               _velocities[i] = Offset.zero;
+              // 다른 캐릭터와 충돌 중인 경우
             } else if (_activeCollisions
                 .any((pair) => pair.contains(characterList[i].nickname))) {
-              _velocities[i] = Offset.zero;
+              // _velocities[i] = Offset.zero;
+              // 플레이어가 아니고 현재 속도가 0인 경우
             } else if (!characterList[i].isPlayer &&
                 _velocities[i] == Offset.zero) {
               _velocities[i] = _directions[_random.nextInt(_directions.length)];
@@ -394,7 +421,7 @@ class _GameScreenState extends State<GameScreen> {
     });
 
     // 10초마다 각 캐릭터의 방향을 랜덤하게 변경
-    _directionTimer = Timer.periodic(Duration(seconds: 10), (timer) {
+    _directionTimer = Timer.periodic(Duration(seconds: 5), (timer) {
       if (characterList.isNotEmpty && _velocities.isNotEmpty) {
         setState(() {
           int count = min(characterList.length, _velocities.length);
@@ -412,18 +439,89 @@ class _GameScreenState extends State<GameScreen> {
     });
 
     // 1초마다 이동을 정지/재개 (1초 정지, 1초 이동 반복)
-    _pauseTimer = Timer.periodic(Duration(seconds: 1), (timer) {
-      // setState(() {
-      //   _isPaused = !_isPaused;
-      //   _addLog('Pause toggled: $_isPaused');
-      // });
-    });
+    // _pauseTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+    // setState(() {
+    //   _isPaused = !_isPaused;
+    //   _addLog('Pause toggled: $_isPaused');
+    // });
+    // });
+  }
+
+  //마주치면 상호작용 시작하기
+  void chatAnimal(
+    collisionData,
+  ) async {
+    var pairKey = collisionData["pairKey"];
+    String character_1_nickname = pairKey.toString().split("_")[0];
+    String character_2_nickname = pairKey.toString().split("_")[1];
+
+    Animal? character_1;
+    Animal? character_2;
+    int? character_1_index;
+    int? character_2_index;
+
+    for (int i = 0; i<characterList.length; i++){
+      Animal animal = characterList[i];
+      if (animal.nickname == character_1_nickname){
+        character_1_index = i;
+        character_1 = animal;
+        continue;
+      }
+
+      if (animal.nickname == character_2_nickname){
+        character_2_index = i;
+        character_2 = animal;
+        continue;
+      }
+    }
+
+    if (character_1 == null || character_2 == null){
+      return;
+    }
+
+    if (character_1.isPlayer || character_2.isPlayer){
+      return;
+    }
+   
+    Dio dio = Dio(
+      BaseOptions(
+        baseUrl: "http://122.46.89.124:7000",
+        headers: {'Content-Type': 'application/json'},
+      ),
+    );
+
+    Offset direction1 = _directions[_random.nextInt(_directions.length)];
+    Offset direction2;
+
+    do {
+      direction2 = _directions[_random.nextInt(_directions.length)];
+    } while (direction1 == direction2);
+
+    _velocities[character_1_index!] = direction1;
+    _velocities[character_2_index!] = direction2;
+
+    if (!_isCollidingWithPlayer){
+      Timer(Duration(seconds: 3), () {
+            setState(() {
+              _activeCollisions.remove(pairKey);
+            });
+
+            // 다시 3초 후에 interaction 속성을 false로 설정
+            Timer(Duration(seconds: 3), () {
+              setState(() {
+                character_1!.interaction = false;
+                character_2!.interaction = false;
+              });
+            });
+          });
+    }
+    // 3초 후에 _activeCollisions에서 pairKey를 제거
   }
 
   @override
   void dispose() {
     _subscription?.cancel();
-    channel.sink.close();
+    // channel.sink.close();
     _movementTimer.cancel();
     _directionTimer.cancel();
     _pauseTimer.cancel();
@@ -434,7 +532,8 @@ class _GameScreenState extends State<GameScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final renderBox =_imageKey.currentContext?.findRenderObject() as RenderBox?;
+      final renderBox =
+          _imageKey.currentContext?.findRenderObject() as RenderBox?;
       if (renderBox != null) {
         setState(() {
           _imageSize = renderBox.size;
@@ -451,8 +550,8 @@ class _GameScreenState extends State<GameScreen> {
         final speed = 2.0;
         playerCharacter!.x += details.x * speed;
         playerCharacter!.y += details.y * speed;
-        _addLog(
-            'Player moved to (${playerCharacter!.x.toInt()}, ${playerCharacter!.y.toInt()})');
+        //   _addLog(
+        //       'Player moved to (${playerCharacter!.x.toInt()}, ${playerCharacter!.y.toInt()})');
       }
     });
   }
@@ -515,11 +614,16 @@ class _GameScreenState extends State<GameScreen> {
         body: SafeArea(
       child: Stack(
         children: [
+           
           Positioned.fill(
             child:
                 Image.asset("assets/images/backgroundv2.png", fit: BoxFit.fill),
-                key: _imageKey,
+            key: _imageKey,
           ),
+          // CustomPaint(
+          //             size : Size.infinite,
+          //             painter : GamePainter(blockedZones, _relativePosition, _imageSize)
+          //           ),
           CharacterListView(
             characters: displayList,
           ),
@@ -601,6 +705,7 @@ class _GameScreenState extends State<GameScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                   
                     ElevatedButton(
                       onPressed: _startChat,
                       child: const Text('채팅하기'),

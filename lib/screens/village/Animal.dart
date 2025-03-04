@@ -15,6 +15,8 @@ class Animal {
   final String userId;
   final String character_id;
   bool isPlayer; // ✅ 새로운 속성 추가
+  bool interaction; // 상호작용 진행중인지 플래그
+  bool disabledInteraction;
 
   Animal({
     required this.x,
@@ -29,6 +31,8 @@ class Animal {
     required this.userId,
     required this.character_id,
     this.isPlayer = false, // ✅ 생성자에서 기본값 설정
+    this.interaction = false,
+    this.disabledInteraction = false,
   });
 
 factory Animal.fromJson(Map<String, dynamic> json, {Size? screenSize, double containerSize = 40.0}) {
@@ -40,12 +44,12 @@ factory Animal.fromJson(Map<String, dynamic> json, {Size? screenSize, double con
     final double maxY = screenSize.height - containerSize;
     x = random.nextDouble() * maxX;
     // y = random.nextDouble() * maxY;
-    y = 250 + random.nextDouble() * (550 - 250);
+    y = 270 + random.nextDouble() * (500 - 270);
     // x = 150;
     // y = 400;
   } else {
     x = json['position_x']?.toDouble() ?? 50.0;
-    y = json['position_y']?.toDouble() ?? 250 + random.nextDouble() * (550 - 250);
+    y = json['position_y']?.toDouble() ?? 270 + random.nextDouble() * (500 - 270);
     // x = 150;
     // y = 400;
   }
@@ -61,7 +65,9 @@ factory Animal.fromJson(Map<String, dynamic> json, {Size? screenSize, double con
     status: json['status'] ?? '',
     userId: json['user_id'] ?? '',
     character_id: json["character_id"] ?? "",
-    isPlayer: json['is_player'] ?? false
+    isPlayer: json['is_player'] ?? false,
+    interaction: false,
+    disabledInteraction : false
   );
 }
 }
