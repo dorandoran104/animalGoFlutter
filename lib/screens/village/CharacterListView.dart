@@ -32,6 +32,7 @@ class _CharacterListViewState extends State<CharacterListView> with SingleTicker
           child: GestureDetector(
             onTap: () {
               print('${isPlayer ? "Player" : "Character"} clicked: ${character.nickname}');
+              print('${character}');
             },
             child: Container(
               width: isPlayer ? 60 : 50, // 플레이어 캐릭터 크기 키움
