@@ -16,7 +16,6 @@ class Animal {
   final String character_id;
   bool isPlayer; // ✅ 새로운 속성 추가
   bool interaction; // 상호작용 진행중인지 플래그
-  bool disabledInteraction;
 
   Animal({
     required this.x,
@@ -31,8 +30,7 @@ class Animal {
     required this.userId,
     required this.character_id,
     this.isPlayer = false, // ✅ 생성자에서 기본값 설정
-    this.interaction = false,
-    this.disabledInteraction = false,
+    this.interaction = true,
   });
 
 factory Animal.fromJson(Map<String, dynamic> json, {Size? screenSize, double containerSize = 40.0}) {
@@ -42,9 +40,11 @@ factory Animal.fromJson(Map<String, dynamic> json, {Size? screenSize, double con
     // 화면 내에 캐릭터가 들어갈 수 있는 최대값을 구함.
     final double maxX = screenSize.width - containerSize;
     final double maxY = screenSize.height - containerSize;
-    x = random.nextDouble() * maxX;
+    x = 100;
+    y = 400;
+    // x = random.nextDouble() * maxX;
     // y = random.nextDouble() * maxY;
-    y = 270 + random.nextDouble() * (500 - 270);
+    // y = 270 + random.nextDouble() * (500 - 270);
     // x = 150;
     // y = 400;
   } else {
@@ -67,7 +67,6 @@ factory Animal.fromJson(Map<String, dynamic> json, {Size? screenSize, double con
     character_id: json["character_id"] ?? "",
     isPlayer: json['is_player'] ?? false,
     interaction: false,
-    disabledInteraction : false
   );
 }
 }

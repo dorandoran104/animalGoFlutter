@@ -4,14 +4,11 @@ import 'package:animalgo/screens/village/CharacterListView.dart';
 import '../chat/ChatRoomScreen.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:web_socket_channel/io.dart';
 import 'dart:async';
 import 'dart:math';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_joystick/flutter_joystick.dart';
+import 'package:http/http.dart' as http;
 
 class GameScreen extends StatefulWidget {
   @override
@@ -36,7 +33,7 @@ class _GameScreenState extends State<GameScreen> {
   bool _disablePlayerCollision = false;
 
   List<Rect> blockedZones = [
-    Rect.fromLTWH(0.46666, 0.0001, 0.1111, 0.6333), //가운대 선
+    Rect.fromLTWH(0.43333, 0.0001, 0.1111, 0.6333), //가운대 선
     Rect.fromLTWH(0.00001, 0.000001, 0.99999, 0.333), // 위
     Rect.fromLTWH(0.00001, 0.69999, 0.99999, 0.99999), // 아래
   ];
@@ -119,12 +116,23 @@ class _GameScreenState extends State<GameScreen> {
             response.data as Map<String, dynamic>;
         List<dynamic> data = responseMap["character_list"];
         setState(() {
-          characterList = data.map((json) {
-            final animal =
-                Animal.fromJson(json, screenSize: MediaQuery.of(context).size);
+          // characterList = data.map((json) {
+          //   final animal =
+          //       Animal.fromJson(json, screenSize: MediaQuery.of(context).size);
 
-            print("Created animal: ${animal.nickname}");
-            return animal;
+          //   print("Created animal: ${animal.nickname}");
+          //   return animal;
+            characterList = data.asMap().entries.map((entry) {
+            final index = entry.key; // 인덱스를 사용하여 순서 지정
+            final json = entry.value;
+            final animal = Animal.fromJson(json, screenSize: MediaQuery.of(context).size);
+
+            // 기존 animal.y 값에 100씩 index에 곱한 값을 더해 y 좌표가 100씩 증가하도록 설정
+            animal.y = animal.y + (index * 100);
+            animal.x = animal.x + (index * 10);
+
+            print("Created animal: ${animal.nickname} with y: ${animal.y}");
+          return animal;
           }).toList();
 
           final playerIndex =
@@ -147,6 +155,7 @@ class _GameScreenState extends State<GameScreen> {
               userId: userId,
               character_id: 'player_default',
               isPlayer: true,
+              interaction: false,
             );
             characterList.add(playerCharacter!);
             _addLog('Added default player: ${playerCharacter!.nickname}');
@@ -213,7 +222,6 @@ class _GameScreenState extends State<GameScreen> {
       Animal player = characterList.firstWhere((animal) => animal.isPlayer);
 
       player.interaction = false;
-      player.disabledInteraction = false;
       // 모든 동물 속도 재설정
       for (var i = 0; i < characterList.length; i++) {
         if (!characterList[i].isPlayer &&
@@ -370,10 +378,10 @@ class _GameScreenState extends State<GameScreen> {
                     }
                   }
                   // 플레이어와 충돌하지 않은 경우, 두 캐릭터의 속도를 0으로 설정
-                  if (!isCollidingWithPlayer && animalJ.interaction || animalI.interaction) {
-                    _velocities[i] = Offset.zero;
-                    _velocities[j] = Offset.zero;
-                  }
+                  // if (!isCollidingWithPlayer && animalJ.interaction || animalI.interaction) {
+                  //   _velocities[i] = Offset.zero;
+                  //   _velocities[j] = Offset.zero;
+                  // }
                 } else {
                   // 충돌이 해제된 경우, 충돌 쌍을 제거
                   if (_activeCollisions.contains(pairKey)) {
@@ -408,7 +416,7 @@ class _GameScreenState extends State<GameScreen> {
               // 다른 캐릭터와 충돌 중인 경우
             } else if (_activeCollisions
                 .any((pair) => pair.contains(characterList[i].nickname))) {
-              // _velocities[i] = Offset.zero;
+              _velocities[i] = Offset.zero;
               // 플레이어가 아니고 현재 속도가 0인 경우
             } else if (!characterList[i].isPlayer &&
                 _velocities[i] == Offset.zero) {
@@ -460,62 +468,131 @@ class _GameScreenState extends State<GameScreen> {
     int? character_1_index;
     int? character_2_index;
 
-    for (int i = 0; i<characterList.length; i++){
+    List<Animal> animal_list = [];
+
+    for (int i = 0; i < characterList.length; i++) {
       Animal animal = characterList[i];
-      if (animal.nickname == character_1_nickname){
+      if (animal.nickname == character_1_nickname) {
         character_1_index = i;
         character_1 = animal;
         continue;
       }
 
-      if (animal.nickname == character_2_nickname){
+      if (animal.nickname == character_2_nickname) {
         character_2_index = i;
         character_2 = animal;
         continue;
       }
     }
 
-    if (character_1 == null || character_2 == null){
+    if (character_1 == null || character_2 == null) {
       return;
     }
 
-    if (character_1.isPlayer || character_2.isPlayer){
+    if (character_1.isPlayer || character_2.isPlayer) {
       return;
     }
-   
-    Dio dio = Dio(
-      BaseOptions(
-        baseUrl: "http://122.46.89.124:7000",
-        headers: {'Content-Type': 'application/json'},
-      ),
-    );
 
-    Offset direction1 = _directions[_random.nextInt(_directions.length)];
-    Offset direction2;
+    animal_list.add(character_1);
+    animal_list.add(character_2);
 
-    do {
-      direction2 = _directions[_random.nextInt(_directions.length)];
-    } while (direction1 == direction2);
+    animal_list.sort((a, b) => a.character_id.compareTo(b.character_id));
 
-    _velocities[character_1_index!] = direction1;
-    _velocities[character_2_index!] = direction2;
+    final url = Uri.parse(
+        'http://127.0.0.1:8000/home/ai_characters_chats'); // FastAPI 엔드포인트
+    final request = http.MultipartRequest('POST', url);
 
-    if (!_isCollidingWithPlayer){
-      Timer(Duration(seconds: 3), () {
-            setState(() {
-              _activeCollisions.remove(pairKey);
-            });
+    request.headers['Accept'] = 'text/event-stream';
 
-            // 다시 3초 후에 interaction 속성을 false로 설정
-            Timer(Duration(seconds: 3), () {
-              setState(() {
-                character_1!.interaction = false;
-                character_2!.interaction = false;
-              });
+    request.fields['charac_1'] = animal_list[0].character_id;
+    request.fields['charac_2'] = animal_list[1].character_id;
+
+    final client = http.Client();
+    final streamedResponse = await client.send(request);
+    var characterMap = collisionData["characters"];
+    if (streamedResponse.statusCode == 200) {
+      streamedResponse.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen(
+        (String line) {
+          Timer(Duration(seconds: 3),(){
+            setState((){
+              speechBubble = Container();
             });
           });
+          var jsonData = jsonDecode(line);
+          var targetCharacter = characterMap
+              .firstWhere((animal) => animal['id'] == jsonData['speaker']);
+
+          var targetX = targetCharacter["x"];
+          var targetY = targetCharacter["y"];
+
+          setState(() {
+            speechBubble = Positioned(
+              left: targetX, // 화면상의 X좌표
+              top: targetY - 50, // 캐릭터 위 50픽셀 위치
+              child: Container(
+                padding: EdgeInsets.all(8),
+                constraints: BoxConstraints(maxWidth: 200),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.black),
+                ),
+                child: Text(
+                  jsonData["data"], // 말풍선에 표시할 내용
+                  style: TextStyle(fontSize: 14, color: Colors.black),
+                ),
+              ),
+            );
+          });      
+        },
+        onError: (error) {
+          print('Error: $error');
+        },
+        onDone: () {
+          print('Stream completed');
+          client.close();
+
+          Timer(Duration(seconds: 3),(){
+            setState((){
+              speechBubble = Container();
+            });
+          });
+
+          Offset direction1 = _directions[_random.nextInt(_directions.length)];
+          Offset direction2;
+
+          do {
+            direction2 = _directions[_random.nextInt(_directions.length)];
+          } while (direction1 == direction2);
+
+          _velocities[character_1_index!] = direction1;
+          _velocities[character_2_index!] = direction2;
+
+          if (!_isCollidingWithPlayer) {
+            Timer(Duration(seconds: 3), () {
+              setState(() {
+                _activeCollisions.remove(pairKey);
+              });
+
+              // 다시 3초 후에 interaction 속성을 false로 설정
+              Timer(Duration(seconds: 10), () {
+                setState(() {
+                  character_1!.interaction = false;
+                  character_2!.interaction = false;
+                });
+              });
+            });
+          }
+          // 3초 후에 _activeCollisions에서 pairKey를 제거
+        },
+      );
+    } else {
+      print('Failed to connect: ${streamedResponse.statusCode}');
+      client.close();
     }
-    // 3초 후에 _activeCollisions에서 pairKey를 제거
   }
 
   @override
@@ -604,6 +681,8 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
+  Widget speechBubble = Container();
+
   @override
   Widget build(BuildContext context) {
     final displayList = _isPlayerVisible
@@ -614,12 +693,12 @@ class _GameScreenState extends State<GameScreen> {
         body: SafeArea(
       child: Stack(
         children: [
-           
           Positioned.fill(
             child:
                 Image.asset("assets/images/backgroundv2.png", fit: BoxFit.fill),
             key: _imageKey,
           ),
+          speechBubble,
           // CustomPaint(
           //             size : Size.infinite,
           //             painter : GamePainter(blockedZones, _relativePosition, _imageSize)
@@ -705,7 +784,6 @@ class _GameScreenState extends State<GameScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                   
                     ElevatedButton(
                       onPressed: _startChat,
                       child: const Text('채팅하기'),
