@@ -47,7 +47,7 @@ class _CharacterListViewState extends State<CharacterListView> with SingleTicker
                 radius: isPlayer ? 25 : 20,
                 backgroundImage: isPlayer
                     ? const AssetImage('assets/images/char1.png') as ImageProvider
-                    : NetworkImage('${dotenv.env['SERVER_URL']}/image/show_image?character_id=${character.character_id}') as ImageProvider,
+                    : NetworkImage('${dotenv.env['SERVER_URL']}/image/show_image?character_id=${character.character_id}&type=village') as ImageProvider,
               ),
             ),
           ),
