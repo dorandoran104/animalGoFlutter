@@ -277,13 +277,25 @@ class _MetadataDropdownScreenState extends State<MetadataDropdownScreen> {
             Center(
               child: ElevatedButton(
                 onPressed: () async {
-                  await _saveDataToServer(); // ✅ 서버에 데이터 저장 실행
-
+                  await _saveDataToServer();
                 },
-                child: const Text('저장 후 이미지 보기'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color.fromRGBO(230, 150, 248, 0.6),  // ✅ 버튼 색상 변경
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12), // ✅ 둥근 모서리
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), // ✅ 버튼 크기 조절
+                ),
+                child: const Text(
+                  '저장 후 이미지 보기',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white, // ✅ 글씨 색상을 흰색으로 변경
+                  ),
+                ),
               ),
             ),
-
           ],
         ),
       ),

@@ -44,6 +44,23 @@ class MyApp extends StatelessWidget{
     return MaterialApp(
       debugShowCheckedModeBanner: false, // ✅ 디버그 배너 제거
       title: 'Flutter Navigation',
+      theme: ThemeData(
+        useMaterial3: true, // ✅ Material3 적용
+        primaryColor: Colors.white, // ✅ 기본 색상 흰색
+        scaffoldBackgroundColor: Colors.white, // ✅ 전체 배경 흰색
+        canvasColor: Colors.white, // ✅ Drawer, Dialog 등의 기본 배경색도 흰색
+        highlightColor: Colors.transparent, // ✅ 기본 클릭/터치 효과 제거
+        splashColor: Colors.transparent, // ✅ 기본 클릭/터치 스플래시 제거
+        focusColor: Colors.transparent, // ✅ 포커스 효과 제거
+        dialogBackgroundColor: Colors.white, // ✅ 다이얼로그 배경 흰색
+        cardColor: Colors.white, // ✅ 카드 배경 흰색
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.white, // ✅ 앱바 배경 흰색
+          foregroundColor: Colors.black, // ✅ 앱바 아이콘 및 텍스트 색상 검정
+          elevation: 0, // ✅ 앱바 그림자 제거
+          scrolledUnderElevation: 0, // ✅ 스크롤 시 색 변화 방지
+        ),
+      ),
       initialRoute: AppRouter.home,
       onGenerateRoute: AppRouter.generateRoute,
       home: HomeScreen(),

@@ -61,7 +61,7 @@ class _GameScreenState extends State<GameScreen> {
     var wsUrl = dotenv.env['WS_URL'] ?? 'ws://122.46.89.124:7000/ws';
     wsUrl += '/1';
     print(wsUrl);
-    _addLog('Connecting to WebSocket: $wsUrl');
+    //_addLog('Connecting to WebSocket: $wsUrl');
     if (kIsWeb) {
       channel = WebSocketChannel.connect(Uri.parse(wsUrl));
     } else {
@@ -70,15 +70,15 @@ class _GameScreenState extends State<GameScreen> {
     _subscription = channel.stream.listen(
           (message) {
         print('Received message: $message');
-        _addLog('WS Received: $message');
+        // _addLog('WS Received: $message');
       },
       onError: (error) {
         print('WebSocket error: $error');
-        _addLog('WS Error: $error');
+        // _addLog('WS Error: $error');
       },
       onDone: () {
         print('WebSocket connection closed');
-        _addLog('WS Closed');
+        // _addLog('WS Closed');
         _isWebSocketConnected = false;
       },
     );
@@ -89,7 +89,8 @@ class _GameScreenState extends State<GameScreen> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('cookie');
     final userId = prefs.getString('user_id') ?? 'default_user';
-
+    final nickname = prefs.getString('nickname') ??
+        'Player'; // 저장된 닉네임 가져오기, 없으면 'Player' 사용
     try {
       Dio dio = Dio(
         BaseOptions(
@@ -97,31 +98,44 @@ class _GameScreenState extends State<GameScreen> {
           headers: {'Content-Type': 'application/json'},
         ),
       );
-      _addLog('Fetching characters...');
+      //addLog('Fetching characters...');
       var response = await dio.get("/village/get_characters/${token}");
+      print('Server response: ${response.data}');
       if (response.statusCode == 200 && response.data["result"]) {
-        Map<String, dynamic> responseMap = response.data as Map<String, dynamic>;
+        Map<String, dynamic> responseMap = response.data as Map<String,
+            dynamic>;
         List<dynamic> data = responseMap["character_list"];
         setState(() {
           characterList = data.map((json) {
-            final animal = Animal.fromJson(json, screenSize: MediaQuery.of(context).size);
+            final animal = Animal.fromJson(json, screenSize: MediaQuery
+                .of(context)
+                .size);
             return animal;
           }).toList();
 
-          final playerIndex = characterList.indexWhere((animal) => animal.userId == userId);
+          // `isPlayer`가 true인 캐릭터를 플레이어로 설정
+          final playerIndex = characterList.indexWhere((animal) =>
+          animal.isPlayer);
           if (playerIndex != -1) {
-            characterList[playerIndex].isPlayer = true;
             playerCharacter = characterList[playerIndex];
-            _addLog('Player set: ${playerCharacter!.nickname}');
+            // _addLog('Player set: ${playerCharacter!.nickname}');
           } else {
+            // 기본 플레이어 생성
             playerCharacter = Animal(
-              x: MediaQuery.of(context).size.width / 2,
-              y: MediaQuery.of(context).size.height / 2,
+              x: MediaQuery
+                  .of(context)
+                  .size
+                  .width / 2,
+              y: MediaQuery
+                  .of(context)
+                  .size
+                  .height / 2,
               characterPath: 'assets/images/char1.png',
               originalPath: '',
               animalType: 'default',
               appearance: 'default',
-              nickname: 'Player',
+              nickname: nickname,
+              // 로그인 시 저장된 닉네임 사용
               personality: 'neutral',
               status: 'idle',
               userId: userId,
@@ -129,18 +143,15 @@ class _GameScreenState extends State<GameScreen> {
               isPlayer: true,
             );
             characterList.add(playerCharacter!);
-            _addLog('Added default player: ${playerCharacter!.nickname}');
+            //_addLog('Added default player: ${playerCharacter!.nickname}');
           }
 
-          print('Character list length: ${characterList.length}');
-          print('Player character: ${playerCharacter?.nickname}, isPlayer: ${playerCharacter?.isPlayer}');
           _velocities = List.generate(characterList.length, (_) => Offset.zero);
         });
       }
     } on DioException catch (e) {
       setState(() {
         print('Error fetching characters: $e');
-        _addLog('Error fetching characters: $e');
         characterList = [];
         playerCharacter = null;
         _velocities = [];
@@ -156,14 +167,14 @@ class _GameScreenState extends State<GameScreen> {
           headers: {'Content-Type': 'application/json'},
         ),
       );
-      // 친밀도 변경 API 호출
       var response = await dio.post("/village/action/$characterId/$action");
       if (response.statusCode == 200) {
-        _addLog('$action 성공: ${response.data.toString()}');
-        // 친밀도 조회 API 호출
-        var affinityResponse = await dio.get("/village/get_affinity/$characterId");
+        var affinityResponse = await dio.get(
+            "/village/get_affinity/$characterId");
         if (affinityResponse.statusCode == 200) {
-          _addLog('현재 친밀도: ${affinityResponse.data.toString()}');
+          final points = affinityResponse.data?['affinity']?['points'] ?? 'N/A';
+          // 캐릭터 이름과 함께 친밀도 포인트 표시
+          _addLog('${_lastCollidedAnimalName}의 현재 친밀도 : $points');
         } else {
           _addLog('친밀도 조회 실패: ${affinityResponse.statusCode}');
         }
@@ -180,7 +191,8 @@ class _GameScreenState extends State<GameScreen> {
       _isClearingCollisions = true;
       _disablePlayerCollision = true;
       _activeCollisions.removeWhere((pair) {
-        return characterList.any((animal) => animal.isPlayer && pair.contains(animal.nickname));
+        return characterList.any((animal) =>
+        animal.isPlayer && pair.contains(animal.nickname));
       });
       _isCollidingWithPlayer = false;
       _isColliding = false;
@@ -189,17 +201,43 @@ class _GameScreenState extends State<GameScreen> {
 
       // 모든 동물 속도 재설정
       for (var i = 0; i < characterList.length; i++) {
-        if (!characterList[i].isPlayer && !_activeCollisions.any((pair) => pair.contains(characterList[i].nickname))) {
+        if (!characterList[i].isPlayer && !_activeCollisions.any((pair) =>
+            pair.contains(characterList[i].nickname))) {
           _velocities[i] = _directions[_random.nextInt(_directions.length)];
         }
       }
-      _addLog('플레이어와의 충돌 해제, 동물 움직임 복구');
+      // _addLog('플레이어와의 충돌 해제, 동물 움직임 복구');
 
       // 3초 후 플레이어 충돌 감지 재활성화
       Timer(Duration(seconds: 3), () {
         setState(() {
           _disablePlayerCollision = false;
-          _addLog('플레이어 충돌 감지 재활성화');
+          //    _addLog('플레이어 충돌 감지 재활성화');
+        });
+      });
+    });
+  }
+
+  void _exitCollision() {
+    setState(() {
+      _disablePlayerCollision = true; // 충돌 비활성화
+      _activeCollisions.removeWhere((pair) {
+        return characterList.any((animal) =>
+        animal.isPlayer && pair.contains(animal.nickname));
+      });
+      _isCollidingWithPlayer = false;
+      _isColliding = false;
+      _lastCollidedAnimalId = null;
+      _lastCollidedAnimalName = null;
+
+      // 로그 추가
+      //_addLog('충돌이 3초간 비활성화되었습니다.');
+
+      // 3초 후 충돌 감지 재활성화
+      Timer(Duration(seconds: 3), () {
+        setState(() {
+          _disablePlayerCollision = false;
+          // _addLog('충돌 감지가 재활성화되었습니다.');
         });
       });
     });
@@ -217,7 +255,9 @@ class _GameScreenState extends State<GameScreen> {
           int count = min(characterList.length, _velocities.length);
 
           // 위치 업데이트 먼저 수행
-          final screenSize = MediaQuery.of(context).size;
+          final screenSize = MediaQuery
+              .of(context)
+              .size;
           final maxX = screenSize.width - 50;
           final maxY = screenSize.height - 50;
           for (var i = 0; i < count; i++) {
@@ -226,17 +266,21 @@ class _GameScreenState extends State<GameScreen> {
             characterList[i].y += _velocities[i].dy;
             if (characterList[i].x < 0) {
               characterList[i].x = 0;
-              _velocities[i] = Offset(_velocities[i].dx.abs(), _velocities[i].dy);
+              _velocities[i] =
+                  Offset(_velocities[i].dx.abs(), _velocities[i].dy);
             } else if (characterList[i].x > maxX) {
               characterList[i].x = maxX;
-              _velocities[i] = Offset(-_velocities[i].dx.abs(), _velocities[i].dy);
+              _velocities[i] =
+                  Offset(-_velocities[i].dx.abs(), _velocities[i].dy);
             }
             if (characterList[i].y < 0) {
               characterList[i].y = 0;
-              _velocities[i] = Offset(_velocities[i].dx, _velocities[i].dy.abs());
+              _velocities[i] =
+                  Offset(_velocities[i].dx, _velocities[i].dy.abs());
             } else if (characterList[i].y > maxY) {
               characterList[i].y = maxY;
-              _velocities[i] = Offset(_velocities[i].dx, -_velocities[i].dy.abs());
+              _velocities[i] =
+                  Offset(_velocities[i].dx, -_velocities[i].dy.abs());
             }
           }
 
@@ -250,22 +294,39 @@ class _GameScreenState extends State<GameScreen> {
                 if (animalI.isPlayer && !_isPlayerVisible) continue;
                 if (animalJ.isPlayer && !_isPlayerVisible) continue;
 
-                String pairKey = (animalI.nickname.compareTo(animalJ.nickname) < 0)
+                String pairKey = (animalI.nickname.compareTo(animalJ.nickname) <
+                    0)
                     ? "${animalI.nickname}_${animalJ.nickname}"
                     : "${animalJ.nickname}_${animalI.nickname}";
-                if ((animalI.x - animalJ.x).abs() < 50 && (animalI.y - animalJ.y).abs() < 50) {
+                if ((animalI.x - animalJ.x).abs() < 50 &&
+                    (animalI.y - animalJ.y).abs() < 50) {
                   if (!_activeCollisions.contains(pairKey)) {
                     _activeCollisions.add(pairKey);
                     final collisionData = {
                       'event': 'collision',
                       'pairKey': pairKey,
                       'characters': [
-                        {'id': animalI.character_id, 'nickname': animalI.nickname, 'x': animalI.x, 'y': animalI.y, 'animaltype': animalI.animalType, 'personality': animalI.personality},
-                        {'id': animalJ.character_id, 'nickname': animalJ.nickname, 'x': animalJ.x, 'y': animalJ.y, 'animaltype': animalJ.animalType, 'personality': animalJ.personality},
+                        {
+                          'id': animalI.character_id,
+                          'nickname': animalI.nickname,
+                          'x': animalI.x,
+                          'y': animalI.y,
+                          'animaltype': animalI.animalType,
+                          'personality': animalI.personality
+                        },
+                        {
+                          'id': animalJ.character_id,
+                          'nickname': animalJ.nickname,
+                          'x': animalJ.x,
+                          'y': animalJ.y,
+                          'animaltype': animalJ.animalType,
+                          'personality': animalJ.personality
+                        },
                       ],
                     };
                     channel.sink.add(jsonEncode(collisionData));
-                    _addLog('${animalI.nickname}과 ${animalJ.nickname}이(가) 충돌했습니다.');
+                    _addLog(
+                        '${animalI.nickname}과 ${animalJ.nickname}가(이) 충돌했습니다.');
                     if (animalI.isPlayer || animalJ.isPlayer) {
                       isCollidingWithPlayer = true;
                       if (animalI.isPlayer) {
@@ -289,21 +350,27 @@ class _GameScreenState extends State<GameScreen> {
               }
             }
 
-            _isColliding = isCollidingWithPlayer || _activeCollisions.any((pair) {
-              return characterList.any((animal) => animal.isPlayer && (pair.contains(animal.nickname)));
-            });
+            _isColliding =
+                isCollidingWithPlayer || _activeCollisions.any((pair) {
+                  return characterList.any((animal) =>
+                  animal.isPlayer && (pair.contains(animal.nickname)));
+                });
 
-            _isCollidingWithPlayer = isCollidingWithPlayer || _activeCollisions.any((pair) {
-              return characterList.any((animal) => animal.isPlayer && (pair.contains(animal.nickname)));
-            });
+            _isCollidingWithPlayer =
+                isCollidingWithPlayer || _activeCollisions.any((pair) {
+                  return characterList.any((animal) =>
+                  animal.isPlayer && (pair.contains(animal.nickname)));
+                });
           }
 
           for (var i = 0; i < count; i++) {
             if (_isCollidingWithPlayer) {
               _velocities[i] = Offset.zero;
-            } else if (_activeCollisions.any((pair) => pair.contains(characterList[i].nickname))) {
+            } else if (_activeCollisions.any((pair) =>
+                pair.contains(characterList[i].nickname))) {
               _velocities[i] = Offset.zero;
-            } else if (!characterList[i].isPlayer && _velocities[i] == Offset.zero) {
+            } else
+            if (!characterList[i].isPlayer && _velocities[i] == Offset.zero) {
               _velocities[i] = _directions[_random.nextInt(_directions.length)];
             }
           }
@@ -320,7 +387,9 @@ class _GameScreenState extends State<GameScreen> {
           for (var i = 0; i < count; i++) {
             if (_isCollidingWithPlayer) {
               _velocities[i] = Offset.zero;
-            } else if (!characterList[i].isPlayer && !_activeCollisions.any((pair) => pair.contains(characterList[i].nickname))) {
+            } else if (!characterList[i].isPlayer &&
+                !_activeCollisions.any((pair) =>
+                    pair.contains(characterList[i].nickname))) {
               _velocities[i] = _directions[_random.nextInt(_directions.length)];
             }
           }
@@ -331,7 +400,7 @@ class _GameScreenState extends State<GameScreen> {
     _pauseTimer = Timer.periodic(Duration(seconds: 1), (timer) {
       setState(() {
         _isPaused = !_isPaused;
-        _addLog('Pause toggled: $_isPaused');
+        // _addLog('Pause toggled: $_isPaused');
       });
     });
   }
@@ -352,7 +421,7 @@ class _GameScreenState extends State<GameScreen> {
         final speed = 2.0;
         playerCharacter!.x += details.x * speed;
         playerCharacter!.y += details.y * speed;
-        _addLog('Player moved to (${playerCharacter!.x.toInt()}, ${playerCharacter!.y.toInt()})');
+        //   _addLog('Player moved to (${playerCharacter!.x.toInt()}, ${playerCharacter!.y.toInt()})');
       }
     });
   }
@@ -360,19 +429,21 @@ class _GameScreenState extends State<GameScreen> {
   void _togglePlayerVisibility() {
     setState(() {
       _isPlayerVisible = !_isPlayerVisible;
-      _addLog('Player visibility: $_isPlayerVisible');
+      //  _addLog('Player visibility: $_isPlayerVisible');
     });
   }
 
   void _startChat() async {
-    if (_isCollidingWithPlayer && _lastCollidedAnimalId != null && _lastCollidedAnimalName != null) {
+    if (_isCollidingWithPlayer && _lastCollidedAnimalId != null &&
+        _lastCollidedAnimalName != null) {
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ChatRoomScreen(
-            chatId: _lastCollidedAnimalId!,
-            friendName: _lastCollidedAnimalName!,
-          ),
+          builder: (context) =>
+              ChatRoomScreen(
+                chatId: _lastCollidedAnimalId!,
+                friendName: _lastCollidedAnimalName!,
+              ),
         ),
       );
       _clearPlayerCollisions();
@@ -382,7 +453,23 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _feedAnimal() async {
-    if (_isCollidingWithPlayer && _lastCollidedAnimalId != null && _lastCollidedAnimalName != null) {
+    if (_isCollidingWithPlayer && _lastCollidedAnimalId != null &&
+        _lastCollidedAnimalName != null) {
+      _addLog('${_lastCollidedAnimalName}에게 먹이를 주었습니다.');
+
+      // 충돌한 캐릭터의 말풍선 활성화
+      final collidedAnimalIndex = characterList.indexWhere((animal) =>
+      animal.character_id == _lastCollidedAnimalId);
+      print(
+          'Collided Animal Index: $collidedAnimalIndex, ID: $_lastCollidedAnimalId'); // 디버깅 로그 추가
+      if (collidedAnimalIndex != -1) {
+        print('Setting speech bubble for ${characterList[collidedAnimalIndex]
+            .nickname}'); // 디버깅 로그 추가
+      } else {
+        print(
+            'Failed to find collided animal with ID: $_lastCollidedAnimalId'); // 디버깅 로그 추가
+      }
+
       await _updateAffinity(_lastCollidedAnimalId!, 'feeding');
       _clearPlayerCollisions();
     } else {
@@ -391,7 +478,9 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _ignoreAnimal() async {
-    if (_isCollidingWithPlayer && _lastCollidedAnimalId != null && _lastCollidedAnimalName != null) {
+    if (_isCollidingWithPlayer && _lastCollidedAnimalId != null &&
+        _lastCollidedAnimalName != null) {
+      _addLog('${_lastCollidedAnimalName}을(를) 무시했습니다.'); // 캐릭터 이름 포함
       await _updateAffinity(_lastCollidedAnimalId!, 'ignore');
       _clearPlayerCollisions();
     } else {
@@ -409,51 +498,86 @@ class _GameScreenState extends State<GameScreen> {
       body: SafeArea(
         child: Stack(
           children: [
+            // 전체 화면 배경 (backgroundv2.png)
             Positioned.fill(
-              child: Image.asset("assets/images/backgroundv2.png", fit: BoxFit.cover),
+              child: Image.asset(
+                "assets/images/backgroundv2.png",
+                fit: BoxFit.cover,
+              ),
             ),
             CharacterListView(
               characters: displayList,
             ),
+            // 로그 창
             Align(
               alignment: Alignment.topCenter,
               child: Padding(
-                padding: const EdgeInsets.only(top: 16.0),
+                padding: const EdgeInsets.only(top: 0.0),
                 child: Container(
-                  width: 300,
-                  height: 100,
-                  color: Colors.black.withOpacity(0.7),
-                  child: _logs.isEmpty
-                      ? const Center(
-                    child: Text(
-                      'No logs available',
-                      style: TextStyle(
-                        fontFamily: 'PressStart2P',
-                        fontSize: 10,
-                        color: Colors.white,
+                  width: 382,
+                  height: 180,
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage("assets/images/log.png"),
+                      fit: BoxFit.cover,
+                      colorFilter: ColorFilter.mode(
+                        Colors.black.withOpacity(0.9),
+                        BlendMode.dstATop,
                       ),
                     ),
-                  )
-                      : ListView.builder(
-                    reverse: true,
-                    itemCount: _logs.length,
-                    itemBuilder: (context, index) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 4.0),
+                  ),
+                  child: ClipRect(
+                    child: SizedBox(
+                      height: 150,
+                      child: _logs.isEmpty
+                          ? const Center(
                         child: Text(
-                          _logs[index],
-                          style: const TextStyle(
-                            fontFamily: 'PressStart2P',
-                            fontSize: 10,
-                            color: Colors.white,
+                          '',
+                          style: TextStyle(
+                            fontFamily: 'Galmuri9',
+                            fontSize: 12,
+                            color: Colors.black,
                           ),
                         ),
-                      );
-                    },
+                      )
+                          : Padding(
+                        padding: const EdgeInsets.only(top: 26.0, bottom: 5.0),
+                        child: ListView.builder(
+                          reverse: true,
+                          itemCount: _logs.length,
+                          shrinkWrap: true,
+                          physics: ClampingScrollPhysics(),
+                          itemBuilder: (context, index) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 2.0, horizontal: 4.0),
+                              child: Text(
+                                _logs[index],
+                                style: const TextStyle(
+                                  fontFamily: 'Galmuri9',
+                                  fontSize: 12,
+                                  color: Colors.black,
+                                  overflow: TextOverflow.ellipsis,
+                                  shadows: [
+                                    Shadow(
+                                      blurRadius: 2.0,
+                                      color: Colors.white,
+                                      offset: Offset(1.0, 1.0),
+                                    ),
+                                  ],
+                                ),
+                                maxLines: 1,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
+            // 숨기기/보이기 버튼과 조이스틱
             Align(
               alignment: Alignment.bottomRight,
               child: Padding(
@@ -461,12 +585,9 @@ class _GameScreenState extends State<GameScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    ElevatedButton(
+                    _buildSelectButton( // select.png 사용
                       onPressed: _togglePlayerVisibility,
-                      child: Text(_isPlayerVisible ? '숨기기' : '보이기'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
+                      text: _isPlayerVisible ? '숨기' : '나타나기',
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
@@ -481,6 +602,7 @@ class _GameScreenState extends State<GameScreen> {
                 ),
               ),
             ),
+// 2x2 버튼 그룹
             Align(
               alignment: Alignment.bottomLeft,
               child: Padding(
@@ -488,33 +610,147 @@ class _GameScreenState extends State<GameScreen> {
                 child: AnimatedOpacity(
                   opacity: _isColliding ? 1.0 : 0.5,
                   duration: const Duration(milliseconds: 300),
-                  child: Row(
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      ElevatedButton(
-                        onPressed: _startChat,
-                        child: const Text('채팅하기'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildSelect2Button( // select2.png 사용
+                            onPressed: _startChat,
+                            text: '채팅하기',
+                          ),
+                          const SizedBox(width: 16),
+                          _buildSelect2Button( // select2.png 사용
+                            onPressed: _feedAnimal,
+                            text: '먹이주기',
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
-                      ElevatedButton(
-                        onPressed: _feedAnimal,
-                        child: const Text('먹이주기'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton(
-                        onPressed: _ignoreAnimal,
-                        child: const Text('무시하기'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildSelect2Button( // select2.png 사용
+                            onPressed: _ignoreAnimal,
+                            text: '무시하기',
+                          ),
+                          const SizedBox(width: 16),
+                          _buildSelect2Button( // select2.png 사용
+                            onPressed: _exitCollision,
+                            text: '나가기',
+                          ),
+                        ],
                       ),
                     ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+// select.png용 버튼
+  Widget _buildSelectButton({
+    required VoidCallback onPressed,
+    required String text,
+  }) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ButtonStyle(
+        padding: MaterialStateProperty.all(const EdgeInsets.all(0)),
+        backgroundColor: MaterialStateProperty.all(Colors.transparent),
+        foregroundColor: MaterialStateProperty.all(Colors.transparent),
+        overlayColor: MaterialStateProperty.all(Colors.transparent),
+        shape: MaterialStateProperty.all(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        elevation: MaterialStateProperty.all(0),
+        minimumSize: MaterialStateProperty.all(const Size(80, 40)),
+      ),
+      child: Container(
+        width: 80,
+        height: 40,
+        child: Stack(
+          children: [
+            Positioned(
+              top: 10,
+              left: 0,
+              right: 4,
+              bottom: 0,
+              child: Image.asset(
+                'assets/images/select.png',
+                fit: BoxFit.contain,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Center(
+                child: Text(
+                  text,
+                  style: const TextStyle(
+                    fontFamily: 'Galmuri9',
+                    fontSize: 14,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+// select2.png용 버튼 (크기 조정 포함)
+  Widget _buildSelect2Button({
+    required VoidCallback onPressed,
+    required String text,
+  }) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ButtonStyle(
+        padding: MaterialStateProperty.all(const EdgeInsets.all(0)),
+        backgroundColor: MaterialStateProperty.all(Colors.transparent),
+        foregroundColor: MaterialStateProperty.all(Colors.transparent),
+        overlayColor: MaterialStateProperty.all(Colors.transparent),
+        shape: MaterialStateProperty.all(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        elevation: MaterialStateProperty.all(0),
+        minimumSize: MaterialStateProperty.all(
+            const Size(90, 48)), // 버튼 자체 크기 키움
+      ),
+      child: Container(
+        width: 100, // 컨테이너 크기 증가
+        height: 60,
+        child: Stack(
+          children: [
+            Positioned(
+              top: 13,
+              // 더 큰 이미지에 맞게 조정
+              left: -2,
+              right: 5,
+              bottom: -5,
+              child: Image.asset(
+                'assets/images/select2.png',
+                fit: BoxFit.contain,
+                width: 94, // 더 큰 너비
+                height: 52, // 더 큰 높이
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 12), // 텍스트 위치 조정
+              child: Center(
+                child: Text(
+                  text,
+                  style: const TextStyle(
+                    fontFamily: 'Galmuri9',
+                    fontSize: 14,
+                    color: Colors.black,
                   ),
                 ),
               ),

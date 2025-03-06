@@ -101,39 +101,53 @@ class _LoginScreenState extends State<LoginScreen> {
       final prefs = await SharedPreferences.getInstance();
       String? cookie = prefs.getString('cookie');
       if (response.statusCode == 200) {
+        final responseData = response.data as Map<String, dynamic>;
+        String? serverCookie = responseData['cookie']; // 서버에서 제공하는 쿠키
+        String? nickname = responseData['user_nickname']; // 서버에서 제공하는 닉네임
+
+        // cookie 저장 (서버 쿠키가 없으면 id 사용)
         if (cookie == null || cookie.isEmpty) {
-          cookie = id;
+          cookie = serverCookie ?? id;
           await prefs.setString("cookie", cookie);
           print("쿠키 저장 완료: $cookie");
         }
+
+        // user_id 저장
+        await prefs.setString('user_id', id);
+
+        // nickname 저장
+        if (nickname != null) {
+          await prefs.setString('nickname', nickname);
+          print("닉네임 저장 완료: $nickname");
+        } else {
+          print("서버에서 닉네임을 제공하지 않음");
+        }
+
         Navigator.pushReplacement(
-            context,
-            // 'HomeScreen' // MaterialPageRoute(builder: (context) => HomeScreen()
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) =>
-                  HomeScreen(),
-            ));
+          context,
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => HomeScreen(),
+          ),
+        );
       }
-    } on DioException catch(e){
+    } on DioException catch (e) {
       if (e.response != null) {
         if (e.response?.data is Map<String, dynamic>) {
-            // 응답이 Map인지 확인
-            final responseData = e.response?.data as Map<String, dynamic>;
-            if (responseData.containsKey('detail')) {
-              String message = responseData['detail'];
-              if(message == '401: Invalid password'){
-                SnackbarHelper.showSnackbar(context,'아이디 또는 비밀번호를 확인해 주세요.');
-              }
-              else if(message == '404: User not found'){
-                SnackbarHelper.showSnackbar(context,'아이디 또는 비밀번호를 확인해 주세요.');
-              }
-            }else{
-              SnackbarHelper.showSnackbar(context,'아이디 또는 비밀번호를 확인해 주세요.');
+          final responseData = e.response?.data as Map<String, dynamic>;
+          if (responseData.containsKey('detail')) {
+            String message = responseData['detail'];
+            if (message == '401: Invalid password') {
+              SnackbarHelper.showSnackbar(context, '아이디 또는 비밀번호를 확인해 주세요.');
+            } else if (message == '404: User not found') {
+              SnackbarHelper.showSnackbar(context, '아이디 또는 비밀번호를 확인해 주세요.');
             }
+          } else {
+            SnackbarHelper.showSnackbar(context, '아이디 또는 비밀번호를 확인해 주세요.');
           }
+        }
       }
-    } catch (e1) {
-      SnackbarHelper.showSnackbar(context,'서버에서 오류가 발생했습니다.');
+    } catch (e) {
+      SnackbarHelper.showSnackbar(context, '서버에서 오류가 발생했습니다.');
     }
   }
 
@@ -208,7 +222,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   shape: RoundedRectangleBorder(
                     borderRadius:
-                        BorderRadius.circular(4), // 로그인 버튼의 border radius
+                    BorderRadius.circular(4), // 로그인 버튼의 border radius
                   ),
                 ),
                 child: const Text(
@@ -230,7 +244,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   shape: RoundedRectangleBorder(
                       borderRadius:
-                          BorderRadius.circular(4), // 로그인 버튼의 border radius
+                      BorderRadius.circular(4), // 로그인 버튼의 border radius
                       side: BorderSide(
                           color: const Color.fromARGB(255, 190, 190, 190),
                           width: 1.0)),
@@ -276,7 +290,7 @@ class _LoginScreenState extends State<LoginScreen> {
 //   final FocusNode _idFocusNode = FocusNode();
 //   final FocusNode _passwordFocusNode = FocusNode();
 
-  
+
 
 //   @override
 //   Widget build(BuildContext context) {
@@ -401,4 +415,3 @@ class _LoginScreenState extends State<LoginScreen> {
 //     );
 //   }
 // }
-

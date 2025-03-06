@@ -34,7 +34,7 @@ class _MyPage extends State<MyPage> with WidgetsBindingObserver {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: Text('마이 페이지'),
+        title: Text('마이 페이지', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: Icon(Icons.notifications, color: Colors.black),
@@ -54,7 +54,7 @@ class _MyPage extends State<MyPage> with WidgetsBindingObserver {
               TextSpan(
                 children: [
                   TextSpan(
-                    text: '닉네임', // 닉네임 부분 (크고 굵게)
+                    text: '김블루', // 닉네임 부분 (크고 굵게)
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                   TextSpan(
@@ -162,7 +162,7 @@ class _MyPage extends State<MyPage> with WidgetsBindingObserver {
             MaterialPageRoute(builder: (context) => CameraScreen()),
           );
         },
-        backgroundColor: Colors.black,
+        backgroundColor: Color.fromRGBO(230, 150, 248, 0.6),
         child: Icon(Icons.camera_alt, color: Colors.white),
       ),
       bottomNavigationBar: Bottombar(

@@ -29,7 +29,21 @@ class CaptureRetryScreen extends StatelessWidget {
                   MaterialPageRoute(builder: (context) => CameraScreen()),
                 );
               },
-              child: Text('다시 촬영하기'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color.fromRGBO(230, 150, 248, 0.6), // ✅ 버튼 색상 변경
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12), // ✅ 둥근 모서리
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), // ✅ 버튼 크기 조절
+              ),
+              child: const Text(
+                '다시 촬영하기',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white, // ✅ 글씨 색상을 흰색으로 변경
+                ),
+              ),
             ),
           ],
         ),

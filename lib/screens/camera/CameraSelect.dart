@@ -31,6 +31,7 @@ class _CameraSelectState extends State<CameraSelect> {
 
   final List<String> personalityOptions = ['밝음', '차분함', '활발함', '조용함'];
   final List<String> appearanceOptions = ['귀여움', '멋짐', '상냥함', '강인함'];
+
   // ✅ COCO 데이터셋의 일반적인 동물 종 목록
   final List<String> animalOptions = [
     '개', '고양이', '말', '양', '코끼리', '곰', '얼룩말', '기린', '소', '새'
@@ -86,7 +87,8 @@ class _CameraSelectState extends State<CameraSelect> {
   /// 서버로 데이터 전송 (동물 종 포함)
   Future<void> _saveDataToServer() async {
     final nickname = nicknameController.text.trim();
-    if (nickname.isEmpty || selectedPersonality == null || selectedAppearance == null || selectedAnimal == null) {
+    if (nickname.isEmpty || selectedPersonality == null ||
+        selectedAppearance == null || selectedAnimal == null) {
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('닉네임, 성격, 외모, 동물의 종을 모두 선택하세요.'))
       );
@@ -94,7 +96,7 @@ class _CameraSelectState extends State<CameraSelect> {
     }
 
     try {
-      final String serverUrl = "http://122.46.89.124:7000/home/upload-original-image";//
+      final String serverUrl = "http://122.46.89.124:7000/home/upload-original-image"; //
 
       var request = http.MultipartRequest('POST', Uri.parse(serverUrl));
 
@@ -105,7 +107,8 @@ class _CameraSelectState extends State<CameraSelect> {
       request.fields['animaltype'] = selectedAnimal!; // 🆕 동물의 종 추가
 
       // ✅ 이미지 파일 추가
-      request.files.add(await http.MultipartFile.fromPath('file', widget.originalImagePath));
+      request.files.add(
+          await http.MultipartFile.fromPath('file', widget.originalImagePath));
       // request.files.add(await http.MultipartFile.fromPath('segmented_image', widget.segmentedImagePath));
 
       var response = await request.send();
@@ -202,6 +205,8 @@ class _CameraSelectState extends State<CameraSelect> {
               child: Image.file(
                 File(imagePath),
                 fit: BoxFit.contain,
+                color: Colors.white, // ✅ 흰색 배경 강제 적용
+                colorBlendMode: BlendMode.dstOver, // ✅ 배경이 비어있는 부분을 흰색으로 채움
                 errorBuilder: (context, error, stackTrace) {
                   return Center(
                     child: Column(
@@ -229,6 +234,9 @@ class _CameraSelectState extends State<CameraSelect> {
       backgroundColor: Colors.white,
       appBar: AppBar(
           backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          elevation: 0,
+          scrolledUnderElevation: 0, // 스크롤 시 배경색 변화 방지
           title: const Text('정보 입력')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -314,7 +322,6 @@ class _CameraSelectState extends State<CameraSelect> {
               },
             ),
             const SizedBox(height: 20),
-
             // ✅ 저장 버튼 (저장 함수 호출)
             Center(
               child: ElevatedButton(

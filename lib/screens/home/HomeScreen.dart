@@ -108,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             MaterialPageRoute(builder: (context) => CameraScreen()),
           );
         },
-        backgroundColor: Colors.black,
+        backgroundColor: Color.fromRGBO(230, 150, 248, 0.6),
         child: Icon(Icons.camera_alt, color: Colors.white),
       ),
       bottomNavigationBar: Bottombar(

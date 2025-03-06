@@ -271,6 +271,10 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
+        scrolledUnderElevation: 0, // 스크롤 시 배경색 변화 방지
         title: Text('카메라'),
         actions: [
           IconButton(
@@ -361,8 +365,11 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
             padding: EdgeInsets.all(20),
             child: FloatingActionButton(
               onPressed: _isProcessing ? null : _captureAndProcess,
-              child: Icon(_isProcessing ? Icons.hourglass_empty : Icons.camera),
-              backgroundColor: _isProcessing ? Colors.grey : null,
+              backgroundColor: _isProcessing ? Colors.grey : Colors.white, // ✅ _isProcessing 상태에 따라 색상 변경
+              child: Icon(
+                _isProcessing ? Icons.hourglass_empty : Icons.photo_camera,
+                color: Colors.black87, // ✅ 아이콘 색상 설정
+              ),
             ),
           ),
         ),

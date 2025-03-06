@@ -56,7 +56,7 @@ factory Animal.fromJson(Map<String, dynamic> json, {Size? screenSize, double con
     status: json['status'] ?? '',
     userId: json['user_id'] ?? '',
     character_id: json["character_id"] ?? "",
-    isPlayer: json['is_player'] ?? false
+    isPlayer: json['is_player'] ?? false,
   );
 }
 }

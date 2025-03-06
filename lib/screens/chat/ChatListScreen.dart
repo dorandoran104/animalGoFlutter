@@ -7,7 +7,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../components/BottomBar.dart';
 import '../home/HomeScreen.dart';
 import '../myPage/my_page.dart';
-import '../village_test/Village.dart';
+import 'package:animalgo/screens/village/VillageScreen.dart'; // ✅ 마을 화면 추가
 import 'ChatRoomScreen.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -50,7 +50,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
           return;
         }
 
-        List<Map<String, dynamic>> newChatRooms = chatList.map((chat) {
+        List<Map<String, dynamic>> newChatRooms = chatList
+            .where((chat) => !(chat["chat_id"]?.toString().contains("_") ?? false)) // ✅ chat_id에 _가 없는 경우만 포함
+            .map((chat) {
           final lastMessage = chat["last_message"] ?? {};
 
           // ✅ lastMessage 값 출력
@@ -71,10 +73,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
         setState(() {
           chatRooms = newChatRooms;
-          isChatListEmpty = false; // ✅ 목록이 채워졌으므로 false 설정
+          isChatListEmpty = newChatRooms.isEmpty; // ✅ 필터링 후에도 비어있는지 확인
         });
 
-        print("✅ 최신 채팅 목록으로 갱신됨!");
+        print("✅ 최신 채팅 목록으로 갱신됨! (chat_id에 _가 없는 채팅방만 표시)");
       } catch (e) {
         print("⚠️ [ERROR] JSON 변환 실패: $e | 원본 메시지: $message");
       }
@@ -82,7 +84,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
       print("⚠️ WebSocket 오류 발생: $error");
     });
   }
-
 
   /// 날짜 형식 변환 함수
   String formatDate(String? dateTimeString) {
@@ -94,6 +95,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
       print("⚠️ 날짜 변환 오류: $e");
       return "unknown";
     }
+  }
+
+  /// 메시지를 지정된 길이로 자르고, 길이가 초과하면 말줄임표를 추가하는 함수
+  String _truncateMessage(String message, int maxLength) {
+    if (message.length <= maxLength) {
+      return message;
+    }
+    return "${message.substring(0, maxLength)}...";
   }
 
   @override
@@ -149,8 +158,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 radius: 24,
                 backgroundColor: Colors.grey[300],
                 backgroundImage: NetworkImage(
-                  "${dotenv
-                      .env['SERVER_URL']}/image/show_image?character_id=${chatRooms[index]["chat_id"]}",
+                  "${dotenv.env['SERVER_URL']}/image/show_image?character_id=${chatRooms[index]["chat_id"]}",
                 ),
                 onBackgroundImageError: (exception, stackTrace) {
                   print("⚠️ 이미지 로드 오류: $exception");
@@ -162,8 +170,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
               title: Text(chatRooms[index]["nickname"] ?? "알 수 없는 사용자"),
               subtitle: Text(
                 chatRooms[index]["last_message"]?["content"]?.isNotEmpty == true
-                    ? chatRooms[index]["last_message"]["content"]
+                    ? _truncateMessage(chatRooms[index]["last_message"]["content"], 24) // 메시지 길이 제한
                     : "메시지가 없습니다.",
+                style: TextStyle(color: Colors.black54), // 색상을 조금 연하게 설정 (선택 사항)
               ),
               trailing: Text(
                 chatRooms[index]["last_active_at"] ?? "unknown",
@@ -173,12 +182,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        ChatRoomScreen(
-                          chatId: chatRooms[index]["chat_id"] ?? "unknown_id",
-                          friendName: chatRooms[index]["nickname"] ??
-                              "알 수 없는 사용자",
-                        ),
+                    builder: (context) => ChatRoomScreen(
+                      chatId: chatRooms[index]["chat_id"] ?? "unknown_id",
+                      friendName: chatRooms[index]["nickname"] ?? "알 수 없는 사용자",
+                    ),
                   ),
                 );
               },

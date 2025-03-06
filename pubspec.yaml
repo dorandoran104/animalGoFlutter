@@ -65,7 +65,12 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.13.1
 
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/aglogo.png"  # 앱 아이콘 이미지 경로
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -109,6 +114,9 @@ flutter:
     - assets/images/background.jpg
     - assets/images/backgroundv1.jpg
     - assets/images/backgroundv2.png
+    - assets/images/log.png
+    - assets/images/select.png
+    - assets/images/select2.png
     - assets/images/char1.png
     - assets/images/google.webp
     - assets/images/kakao.png
