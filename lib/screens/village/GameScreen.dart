@@ -31,6 +31,7 @@ class _GameScreenState extends State<GameScreen> {
   String? _lastCollidedAnimalName;
   bool _isClearingCollisions = false;
   bool _disablePlayerCollision = false;
+  bool _firstDisable = true;
 
   List<Rect> blockedZones = [
     Rect.fromLTWH(0.43333, 0.0001, 0.1111, 0.6333), //가운대 선
@@ -104,8 +105,8 @@ class _GameScreenState extends State<GameScreen> {
     try {
       Dio dio = Dio(
         BaseOptions(
-          baseUrl: "http://122.46.89.124:7000",
-          // baseUrl: "http://127.0.0.1:8000",
+          // baseUrl: "http://122.46.89.124:7000",
+          baseUrl: "http://127.0.0.1:8000",
           headers: {'Content-Type': 'application/json'},
         ),
       );
@@ -128,8 +129,8 @@ class _GameScreenState extends State<GameScreen> {
             final animal = Animal.fromJson(json, screenSize: MediaQuery.of(context).size);
 
             // 기존 animal.y 값에 100씩 index에 곱한 값을 더해 y 좌표가 100씩 증가하도록 설정
-            animal.y = animal.y + (index * 100);
-            animal.x = animal.x + (index * 10);
+            // animal.y = animal.y + (index * 100);
+            // animal.x = animal.x + (index * 10);
 
             print("Created animal: ${animal.nickname} with y: ${animal.y}");
           return animal;
@@ -329,6 +330,10 @@ class _GameScreenState extends State<GameScreen> {
                 // 두 캐릭터가 충돌했는지 확인 (간단히 50x50 박스 기준)
                 if ((animalI.x - animalJ.x).abs() < 50 &&
                     (animalI.y - animalJ.y).abs() < 50) {
+                  if (_firstDisable){
+                    continue;
+                  }
+
                   // 충돌 쌍이 아직 등록되지 않았고, 두 캐릭터가 상호작용 중이 아닌 경우
                   if (!_activeCollisions.contains(pairKey) &&
                       !animalI.interaction &&
@@ -446,6 +451,12 @@ class _GameScreenState extends State<GameScreen> {
       }
     });
 
+    Timer(Duration(seconds:5),(){
+      setState(() {
+        _firstDisable = false;
+      });
+    });
+
     // 1초마다 이동을 정지/재개 (1초 정지, 1초 이동 반복)
     // _pauseTimer = Timer.periodic(Duration(seconds: 1), (timer) {
     // setState(() {
@@ -498,8 +509,8 @@ class _GameScreenState extends State<GameScreen> {
 
     animal_list.sort((a, b) => a.character_id.compareTo(b.character_id));
 
-    final url = Uri.parse(
-        'http://127.0.0.1:8000/home/ai_characters_chats'); // FastAPI 엔드포인트
+    final url = Uri.parse('http://127.0.0.1:8000/home/ai_characters_chats'); // FastAPI 엔드포인트
+    // final url = Uri.parse('http://127.0.0.1:8000/home/ai_characters_chats'); // FastAPI 엔드포인트
     final request = http.MultipartRequest('POST', url);
 
     request.headers['Accept'] = 'text/event-stream';
@@ -516,11 +527,12 @@ class _GameScreenState extends State<GameScreen> {
           .transform(const LineSplitter())
           .listen(
         (String line) {
-          Timer(Duration(seconds: 3),(){
-            setState((){
-              speechBubble = Container();
-            });
-          });
+          // Timer(Duration(seconds: 3),(){
+          //   setState((){
+          //     speechBubble = Container();
+          //   });
+          // });
+          speechBubble = Container();
           var jsonData = jsonDecode(line);
           var targetCharacter = characterMap
               .firstWhere((animal) => animal['id'] == jsonData['speaker']);
@@ -541,7 +553,7 @@ class _GameScreenState extends State<GameScreen> {
                   border: Border.all(color: Colors.black),
                 ),
                 child: Text(
-                  jsonData["data"], // 말풍선에 표시할 내용
+                  jsonData["message"], // 말풍선에 표시할 내용
                   style: TextStyle(fontSize: 14, color: Colors.black),
                 ),
               ),
@@ -698,7 +710,7 @@ class _GameScreenState extends State<GameScreen> {
                 Image.asset("assets/images/backgroundv2.png", fit: BoxFit.fill),
             key: _imageKey,
           ),
-          speechBubble,
+          
           // CustomPaint(
           //             size : Size.infinite,
           //             painter : GamePainter(blockedZones, _relativePosition, _imageSize)
@@ -706,6 +718,7 @@ class _GameScreenState extends State<GameScreen> {
           CharacterListView(
             characters: displayList,
           ),
+          speechBubble,
           Align(
             alignment: Alignment.topCenter,
             child: Padding(
