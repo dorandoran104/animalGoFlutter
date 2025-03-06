@@ -32,6 +32,9 @@ class _GameScreenState extends State<GameScreen> {
   bool _isClearingCollisions = false;
   bool _disablePlayerCollision = false;
   bool _firstDisable = true;
+  final client = http.Client();
+  StreamSubscription<String>? _streamingSubscription;
+  Timer? _speechBubbleTimer;
 
   List<Rect> blockedZones = [
     Rect.fromLTWH(0.43333, 0.0001, 0.1111, 0.6333), //가운대 선
@@ -46,7 +49,7 @@ class _GameScreenState extends State<GameScreen> {
   // 움직임 관련 변수들
   late Timer _movementTimer;
   late Timer _directionTimer;
-  late Timer _pauseTimer;
+  // late Timer _pauseTimer;
   final Random _random = Random();
   late List<Offset> _velocities;
   bool _isPaused = false;
@@ -105,8 +108,8 @@ class _GameScreenState extends State<GameScreen> {
     try {
       Dio dio = Dio(
         BaseOptions(
-          // baseUrl: "http://122.46.89.124:7000",
-          baseUrl: "http://127.0.0.1:8000",
+          baseUrl: "http://122.46.89.124:7000",
+          // baseUrl: "http://127.0.0.1:8000",
           headers: {'Content-Type': 'application/json'},
         ),
       );
@@ -123,17 +126,18 @@ class _GameScreenState extends State<GameScreen> {
 
           //   print("Created animal: ${animal.nickname}");
           //   return animal;
-            characterList = data.asMap().entries.map((entry) {
+          characterList = data.asMap().entries.map((entry) {
             final index = entry.key; // 인덱스를 사용하여 순서 지정
             final json = entry.value;
-            final animal = Animal.fromJson(json, screenSize: MediaQuery.of(context).size);
+            final animal =
+                Animal.fromJson(json, screenSize: MediaQuery.of(context).size);
 
             // 기존 animal.y 값에 100씩 index에 곱한 값을 더해 y 좌표가 100씩 증가하도록 설정
             // animal.y = animal.y + (index * 100);
             // animal.x = animal.x + (index * 10);
 
             print("Created animal: ${animal.nickname} with y: ${animal.y}");
-          return animal;
+            return animal;
           }).toList();
 
           final playerIndex =
@@ -330,7 +334,7 @@ class _GameScreenState extends State<GameScreen> {
                 // 두 캐릭터가 충돌했는지 확인 (간단히 50x50 박스 기준)
                 if ((animalI.x - animalJ.x).abs() < 50 &&
                     (animalI.y - animalJ.y).abs() < 50) {
-                  if (_firstDisable){
+                  if (_firstDisable) {
                     continue;
                   }
 
@@ -451,7 +455,7 @@ class _GameScreenState extends State<GameScreen> {
       }
     });
 
-    Timer(Duration(seconds:5),(){
+    Timer(Duration(seconds: 5), () {
       setState(() {
         _firstDisable = false;
       });
@@ -509,8 +513,8 @@ class _GameScreenState extends State<GameScreen> {
 
     animal_list.sort((a, b) => a.character_id.compareTo(b.character_id));
 
-    final url = Uri.parse('http://127.0.0.1:8000/home/ai_characters_chats'); // FastAPI 엔드포인트
     // final url = Uri.parse('http://127.0.0.1:8000/home/ai_characters_chats'); // FastAPI 엔드포인트
+    final url = Uri.parse('http://122.46.89.124:7000/home/ai_characters_chats'); // FastAPI 엔드포인트
     final request = http.MultipartRequest('POST', url);
 
     request.headers['Accept'] = 'text/event-stream';
@@ -518,11 +522,10 @@ class _GameScreenState extends State<GameScreen> {
     request.fields['charac_1'] = animal_list[0].character_id;
     request.fields['charac_2'] = animal_list[1].character_id;
 
-    final client = http.Client();
     final streamedResponse = await client.send(request);
     var characterMap = collisionData["characters"];
     if (streamedResponse.statusCode == 200) {
-      streamedResponse.stream
+      _streamingSubscription = streamedResponse.stream
           .transform(utf8.decoder)
           .transform(const LineSplitter())
           .listen(
@@ -539,7 +542,7 @@ class _GameScreenState extends State<GameScreen> {
 
           var targetX = targetCharacter["x"];
           var targetY = targetCharacter["y"];
-
+          if (!mounted) return;
           setState(() {
             speechBubble = Positioned(
               left: targetX, // 화면상의 X좌표
@@ -558,20 +561,21 @@ class _GameScreenState extends State<GameScreen> {
                 ),
               ),
             );
-          });      
+          });
         },
         onError: (error) {
           print('Error: $error');
         },
         onDone: () {
           print('Stream completed');
-          client.close();
-
-          Timer(Duration(seconds: 3),(){
-            setState((){
-              speechBubble = Container();
-            });
-          });
+          // client.close();
+          // Timer(Duration(seconds: 3), () {
+          //   if(!mounted) return
+          //   setState(() {
+          //     speechBubble = Container();
+          //   });
+          // });
+          speechBubble =  Container();
 
           Offset direction1 = _directions[_random.nextInt(_directions.length)];
           Offset direction2;
@@ -613,7 +617,9 @@ class _GameScreenState extends State<GameScreen> {
     // channel.sink.close();
     _movementTimer.cancel();
     _directionTimer.cancel();
-    _pauseTimer.cancel();
+    // _pauseTimer.cancel();
+    _streamingSubscription?.cancel();
+    client.close();
     super.dispose();
   }
 
@@ -710,7 +716,7 @@ class _GameScreenState extends State<GameScreen> {
                 Image.asset("assets/images/backgroundv2.png", fit: BoxFit.fill),
             key: _imageKey,
           ),
-          
+
           // CustomPaint(
           //             size : Size.infinite,
           //             painter : GamePainter(blockedZones, _relativePosition, _imageSize)
