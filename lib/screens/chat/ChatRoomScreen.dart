@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
+
 
 import 'ChatListScreen.dart'; // dotenv 사용
 
@@ -245,7 +247,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       "message": messageText,
     };
 
-
     // ✅ Optimistic UI - 사용자 입력을 즉시 UI에 반영
     setState(() {
       messages.add({
@@ -254,12 +255,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         "time": formatTimestamp(DateTime.now().toString()),
       });
 
-      // ✅ 상대방 메시지가 오기 전에 "..." 말풍선 추가
+// ✅ 상대방 메시지가 오기 전에 플레이스홀더 추가 (텍스트 없이)
       messages.add({
-        "message": "...", // 플레이스홀더 메시지
+        "message": "", // 빈 문자열로 설정
         "isSentByMe": false,
-        "time": "", // 시간은 비워둠
-        "isPlaceholder": true, // 플레이스홀더임을 나타내는 필드 추가
+        "time": "",
+        "isPlaceholder": true, // 플레이스홀더임을 나타냄
       });
 
       _scrollToBottom();
@@ -413,12 +414,25 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                         // ✅ 말풍선 (Flexible 사용하여 가로폭 초과 방지)
                         Flexible(
                           child: Container(
-                            padding: const EdgeInsets.all(12),
+                            padding: messageData["isPlaceholder"] == true
+                                ? const EdgeInsets.symmetric(horizontal: 8, vertical: 4) // 플레이스홀더일 때 패딩 축소
+                                : const EdgeInsets.all(12), // 일반 메시지일 때 기존 패딩 유지
+                            constraints: messageData["isPlaceholder"] == true
+                                ? BoxConstraints(
+                              maxWidth: 60.0,
+                              maxHeight: 35.0,// 플레이스홀더일 때 최대 너비를 더 작게 설정
+                            )
+                                : null, // 일반 메시지는 너비 제한 없음
                             decoration: BoxDecoration(
                               color: isSentByMe ? Colors.blueAccent : Colors.grey[300],
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text(
+                            child: messageData["isPlaceholder"] == true
+                                ? SpinKitThreeBounce(
+                              color: Colors.grey[600],
+                              size: 12.0, // 애니메이션 크기 더 축소
+                            )
+                                : Text(
                               message,
                               style: TextStyle(
                                 color: isSentByMe ? Colors.white : Colors.black,
@@ -428,7 +442,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                         ),
 
                         // ✅ 상대방 메시지일 경우 [말풍선] [시간] 순서
-                        if (!isSentByMe)
+                        if (!isSentByMe && messageData["isPlaceholder"] != true)
                           Padding(
                             padding: const EdgeInsets.only(left: 6),
                             child: Text(
@@ -442,7 +456,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 },
               ),
             ),
-
             // ✅ 입력창 - 키보드가 올라와도 가려지지 않도록 SafeArea 적용
             SafeArea(
               child: Container(

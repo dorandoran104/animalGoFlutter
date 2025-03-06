@@ -54,7 +54,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
             .where((chat) => !(chat["chat_id"]?.toString().contains("_") ?? false)) // ✅ chat_id에 _가 없는 경우만 포함
             .map((chat) {
           final lastMessage = chat["last_message"] ?? {};
-
           // ✅ lastMessage 값 출력
           //print("🔹 [DEBUG] lastMessage: $lastMessage");
 
