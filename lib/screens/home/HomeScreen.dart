@@ -34,16 +34,16 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('cookie'); // ✅ 쿠키 값 가져오기
 
-    if (token == null || token.isEmpty) {
-      // ✅ 토큰이 없으면 로그인 화면으로 이동
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => LoginScreen()),
-      );
-      return;
-    }
+    // if (token == null || token.isEmpty) {
+    //   // ✅ 토큰이 없으면 로그인 화면으로 이동
+    //   Navigator.pushReplacement(
+    //     context,
+    //     MaterialPageRoute(builder: (context) => LoginScreen()),
+    //   );
+    //   return;
+    // }
 
-    await _fetchFriends(token); // ✅ 토큰이 있으면 친구 목록 불러오기
+    // await _fetchFriends(token); // ✅ 토큰이 있으면 친구 목록 불러오기
   }
 
   Future<void> _fetchFriends(String token) async {
