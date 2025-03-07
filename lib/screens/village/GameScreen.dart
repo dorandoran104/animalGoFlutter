@@ -614,6 +614,33 @@ class _GameScreenState extends State<GameScreen> {
       );
     } else {
       print('Failed to connect: ${streamedResponse.statusCode}');
+      Offset direction1 = _directions[_random.nextInt(_directions.length)];
+          Offset direction2;
+
+          do {
+            direction2 = _directions[_random.nextInt(_directions.length)];
+          } while (direction1 == direction2);
+
+          _velocities[character_1_index!] = direction1;
+          _velocities[character_2_index!] = direction2;
+
+          if (!_isCollidingWithPlayer) {
+            if (!mounted) return;
+            Timer(Duration(seconds: 3), () {
+              setState(() {
+                _activeCollisions.remove(pairKey);
+              });
+
+              // 다시 3초 후에 interaction 속성을 false로 설정
+              if (!mounted) return;
+              Timer(Duration(seconds: 10), () {
+                setState(() {
+                  character_1!.interaction = false;
+                  character_2!.interaction = false;
+                });
+              });
+            });
+          }
       client.close();
     }
   }
@@ -649,7 +676,7 @@ class _GameScreenState extends State<GameScreen> {
   void _updatePosition(StickDragDetails details) {
     setState(() {
       if (playerCharacter != null && _isPlayerVisible) {
-        final speed = 2.0;
+        final speed = 5.0;
         playerCharacter!.x += details.x * speed;
         playerCharacter!.y += details.y * speed;
         //   _addLog('Player moved to (${playerCharacter!.x.toInt()}, ${playerCharacter!.y.toInt()})');
