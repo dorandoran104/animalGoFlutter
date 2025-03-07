@@ -154,7 +154,7 @@ class _GameScreenState extends State<GameScreen> {
               originalPath: '',
               animalType: 'default',
               appearance: 'default',
-              nickname: nickname,
+              nickname: '김블루',
               // 로그인 시 저장된 닉네임 사용
               personality: 'neutral',
               status: 'idle',
@@ -387,7 +387,7 @@ class _GameScreenState extends State<GameScreen> {
                     chatAnimal(collisionData);
                     // channel.sink.add(jsonEncode(collisionData));
                     _addLog(
-                        '${animalI.nickname}과 ${animalJ.nickname}가(이) 충돌했습니다.');
+                        '${animalI.nickname}와 ${animalJ.nickname}가 만났습니다.');
                     if (animalI.isPlayer || animalJ.isPlayer) {
                       isCollidingWithPlayer = true;
                       if (animalI.isPlayer) {
@@ -441,7 +441,7 @@ class _GameScreenState extends State<GameScreen> {
         });
       }
     });
-    _directionTimer = Timer.periodic(Duration(seconds: 10), (timer) {
+    _directionTimer = Timer.periodic(Duration(seconds: 5), (timer) {
       if (characterList.isNotEmpty && _velocities.isNotEmpty) {
         setState(() {
           int count = min(characterList.length, _velocities.length);
@@ -516,8 +516,8 @@ class _GameScreenState extends State<GameScreen> {
 
     animal_list.sort((a, b) => a.character_id.compareTo(b.character_id));
 
-    final url = Uri.parse('http://127.0.0.1:8000/home/ai_characters_chats'); // FastAPI 엔드포인트
-    // final url = Uri.parse('http://122.46.89.124:7000/home/ai_characters_chats'); // FastAPI 엔드포인트
+    // final url = Uri.parse('http://127.0.0.1:8000/home/ai_characters_chats'); // FastAPI 엔드포인트
+    final url = Uri.parse('http://122.46.89.124:7000/home/ai_characters_chats'); // FastAPI 엔드포인트
     final request = http.MultipartRequest('POST', url);
 
     request.headers['Accept'] = 'text/event-stream';
@@ -547,6 +547,7 @@ class _GameScreenState extends State<GameScreen> {
           var targetY = targetCharacter["y"];
           if (!mounted) return;
           setState(() {
+            _addLog('${targetCharacter['nickname']} : ${jsonData["message"]}');
             speechBubble = Positioned(
               left: targetX, // 화면상의 X좌표
               top: targetY - 50, // 캐릭터 위 50픽셀 위치
@@ -560,12 +561,13 @@ class _GameScreenState extends State<GameScreen> {
                 ),
                 child: Text(
                   jsonData["message"], // 말풍선에 표시할 내용
-                  style: TextStyle(fontSize: 14, color: Colors.black),
+                  style: TextStyle(fontSize: 14, color: Colors.black, fontFamily: 'Galmuri9'),
                 ),
               ),
             );
           });      
         },
+
         onError: (error) {
           print('Error: $error');
         },

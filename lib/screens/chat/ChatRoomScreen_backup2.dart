@@ -124,7 +124,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
         setState(() {
           if (receivedData.containsKey("messages")) {
-            // ✅ 여러 개의 메시지를 포함한 경우
             List<dynamic> rawMessages = receivedData["messages"];
             for (var msg in rawMessages) {
               if (msg["message"] == lastSentMessage && msg["user_id"] == userId) {
@@ -132,23 +131,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 continue;
               }
 
-              // ✅ 기존의 "..." 말풍선이 있다면 교체
               int placeholderIndex = messages.indexWhere((m) => m["isPlaceholder"] == true);
               if (placeholderIndex != -1) {
                 messages[placeholderIndex] = {
                   "message": msg["message"],
                   "isSentByMe": msg["user_id"] == userId,
-                  "time": formatTimestamp(DateTime.now().toString()),
+                  "time": formatTimestamp(msg["timestamp"] ?? DateTime.now().toString()), // 서버 타임스탬프 사용
                 };
               } else {
                 messages.add({
                   "message": msg["message"],
                   "isSentByMe": msg["user_id"] == userId,
-                  "time": formatTimestamp(DateTime.now().toString()),
+                  "time": formatTimestamp(msg["timestamp"] ?? DateTime.now().toString()), // 서버 타임스탬프 사용
                 });
-
-                // ✅ 채팅 목록 업데이트 (ChatListScreen에 반영)
-                // updateChatList(widget.chatId, msg["message"], DateTime.now().toString());
               }
             }
           } else if (receivedData.containsKey("message") && receivedData.containsKey("user_id")) {
@@ -157,23 +152,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               return;
             }
 
-            // ✅ 기존의 "..." 말풍선을 찾아서 교체
             int placeholderIndex = messages.indexWhere((m) => m["isPlaceholder"] == true);
             if (placeholderIndex != -1) {
               messages[placeholderIndex] = {
                 "message": receivedData["message"],
                 "isSentByMe": receivedData["user_id"] == userId,
-                "time": formatTimestamp(DateTime.now().toString()),
+                "time": formatTimestamp(receivedData["timestamp"] ?? DateTime.now().toString()), // 서버 타임스탬프 사용
               };
             } else {
               messages.add({
                 "message": receivedData["message"],
                 "isSentByMe": receivedData["user_id"] == userId,
-                "time": formatTimestamp(DateTime.now().toString()),
+                "time": formatTimestamp(receivedData["timestamp"] ?? DateTime.now().toString()), // 서버 타임스탬프 사용
               });
-
-              // ✅ 채팅 목록 업데이트 (ChatListScreen에 반영)
-              // updateChatList(widget.chatId, receivedData["message"], DateTime.now().toString());
             }
           }
         });
