@@ -37,14 +37,15 @@ class _CharacterListViewState extends State<CharacterListView> with SingleTicker
             child: Container(
               width: isPlayer ? 60 : 50, // 플레이어 캐릭터 크기 키움
               height: isPlayer ? 60 : 50,
-              decoration: isPlayer
-                  ? BoxDecoration(
-                border: Border.all(color: Colors.blueAccent, width: 3), // 파란 테두리
-                shape: BoxShape.circle,
-              )
-                  : null,
+              // decoration: 
+                  // BoxDecoration(
+                // border: Border.all(color: Colors.blueAccent, width: 3), // 파란 테두리
+              //   shape: BoxShape.circle,
+              // )
+                  // : null,
               child: CircleAvatar(
                 radius: isPlayer ? 25 : 20,
+                backgroundColor: Colors.transparent,
                 backgroundImage: isPlayer
                     ? const AssetImage('assets/images/char1.png') as ImageProvider
                     : NetworkImage('${dotenv.env['SERVER_URL']}/image/show_image?character_id=${character.character_id}&type=village') as ImageProvider,
