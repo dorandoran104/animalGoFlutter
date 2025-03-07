@@ -45,12 +45,27 @@ class _ImageFromServerState extends State<ImageFromServer> {
               ),
             ),
             const SizedBox(height: 20),
-
-            ElevatedButton(
-              onPressed: isLoading ? null : () => _sendNicknameToServer(),
-              child: isLoading
-                  ? CircularProgressIndicator(color: Colors.white)
-                  : Text("닉네임 저장"),
+            Center(
+              child: ElevatedButton(
+                onPressed: isLoading ? null : () => _sendNicknameToServer(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color.fromRGBO(230, 150, 248, 0.6), // 버튼 색상 변경
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12), // 둥근 모서리
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), // 버튼 크기 조절
+                ),
+                child: isLoading
+                    ? CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                  "닉네임 저장",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white, // 글씨 색상을 흰색으로 변경
+                  ),
+                ),
+              ),
             ),
           ],
         ),
